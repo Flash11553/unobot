@@ -680,8 +680,11 @@ def enable_translations(update: Update, context: CallbackContext):
         return
 
     else:
-        send_async(
-            context.bot,
-            chat.id,
-            text=_("Only the game creator ({name}) and admin can do that.").format(
-                name=game.starter.first
+    send_async(
+        context.bot,
+        chat.id,
+        text=_("Only the game creator ({name}) and admin can do that.").format(
+            name=game.starter.first_name
+        ),
+        reply_to_message_id=update.message.message_id,
+    )
