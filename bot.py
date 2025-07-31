@@ -88,6 +88,7 @@ def new_game(update: Update, context: CallbackContext):
 
         game = gm.new_game(update.message.chat)
         game.starter = update.message.from_user
+        game.owner = set()
         game.owner.append(update.message.from_user.id)
         game.mode = DEFAULT_GAMEMODE
         send_async(context.bot, chat_id,
