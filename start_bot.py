@@ -1,6 +1,6 @@
 from telegram.ext import Updater, CommandHandler
 
-TOKEN = "SENIN_BOT_TOKENIN"
+TOKEN = "8374635839:AAE4f3lvzdEq2KDZKlMPaYQ5oQ-Pc7n_xws"
 
 def start(update, context):
     update.message.reply_text("Salam! Mən Heroku üzərində işləyən sadə botam.")
