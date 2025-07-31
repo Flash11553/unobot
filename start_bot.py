@@ -1,35 +1,25 @@
-import os
-import gettext
-from telegram.ext import Updater
-from unobot import UnoBot  # əsas UNO oyun klası
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Telegram bot to play UNO in group chats
+# Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-def main():
-    # TOKEN Heroku environment-dan alınır
-    TOKEN = os.environ.get("TOKEN")
-    if not TOKEN:
-        print("❌ Telegram bot token tapılmadı. TOKEN env dəyişəni təyin olunmalıdır.")
-        return
+# Modify this file if you want a different startup sequence, for example using
+# a Webhook
 
-    # Dil sistemini aktivləşdir
-    lang = os.environ.get("LANG", "en")
-    locales_path = os.path.join(os.path.dirname(__file__), "locales")
 
-    try:
-        translation = gettext.translation("unobot", locales_path, languages=[lang])
-        translation.install()
-    except FileNotFoundError:
-        print("⚠️ Dil faylı tapılmadı, default gettext istifadə ediləcək.")
-        gettext.install("unobot")
-
-    # Botu başlat
-    updater = Updater(token=TOKEN, use_context=True)
-
-    # UNO bot obyektini yaradıb handler-ları əlavə et
-    UnoBot(updater)
-
-    print("✅ UNO Bot başladı!")
+def start_bot(updater):
     updater.start_polling()
-    updater.idle()
-
-if __name__ == "__main__":
-    main()
