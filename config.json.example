@@ -2,7 +2,7 @@
     "token": "TOKEN",
     "admin_list": [0],
     "open_lobby": true,
-    "enable_translations": false,
+    "enable_translations": true,
     "workers": 32,
     "default_gamemode": "fast",
     "waiting_time": 120,
