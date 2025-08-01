@@ -380,7 +380,7 @@ msgstr ""
 
 #: simple_commands.py:31
 msgid ""
-"Follow these steps:\n"
+"Follow thessse steps:\n"
 "\n"
 "1. Add this bot to a group\n"
 "2. In the group, start a new game with /new or join an already running game "
