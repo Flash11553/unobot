@@ -110,7 +110,7 @@ def user_locale(func):
         if us and us.lang != 'en':
             _.push(us.lang)
         else:
-            _.push('en_US')
+            _.push('tr_TR')
 
         result = func(update, context, *pargs, **kwargs)
         _.pop()
@@ -133,7 +133,7 @@ def game_locales(func):
                 if us and us.lang != 'en':
                     loc = us.lang
                 else:
-                    loc = 'en_US'
+                    loc = 'tr_TR'
 
                 if loc in locales:
                     continue
