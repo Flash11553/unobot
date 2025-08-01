@@ -723,15 +723,15 @@ dispatcher.add_handler(ChosenInlineResultHandler(process_result, pass_job_queue=
 dispatcher.add_handler(CallbackQueryHandler(select_game))
 dispatcher.add_handler(CommandHandler('start', start_game, pass_args=True, pass_job_queue=True))
 dispatcher.add_handler(CommandHandler('new', new_game))
-dispatcher.add_handler(CommandHandler('kill', kill_game))
+dispatcher.add_handler(CommandHandler('stop', kill_game))
 dispatcher.add_handler(CommandHandler('join', join_game))
 dispatcher.add_handler(CommandHandler('leave', leave_game))
 dispatcher.add_handler(CommandHandler('kick', kick_player))
 dispatcher.add_handler(CommandHandler('open', open_game))
 dispatcher.add_handler(CommandHandler('close', close_game))
-dispatcher.add_handler(CommandHandler('enable_translations',
+dispatcher.add_handler(CommandHandler('enable_translationss',
                                       enable_translations))
-dispatcher.add_handler(CommandHandler('disable_translations',
+dispatcher.add_handler(CommandHandler('disable_translationss',
                                       disable_translations))
 dispatcher.add_handler(CommandHandler('skip', skip_player))
 dispatcher.add_handler(CommandHandler('notify_me', notify_me))
