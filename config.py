@@ -35,7 +35,7 @@ if isinstance(ADMIN_LIST, str):
     ADMIN_LIST = set(int(x) for x in ADMIN_LIST.split())
 
 OPEN_LOBBY = os.getenv("OPEN_LOBBY", config.get("open_lobby", True))
-ENABLE_TRANSLATIONS = os.getenv("ENABLE_TRANSLATIONS", config.get("enable_translations", False))
+ENABLE_TRANSLATIONS = os.getenv("ENABLE_TRANSLATIONS", config.get("enable_translations", True))
 
 if isinstance(OPEN_LOBBY, str):
     OPEN_LOBBY = OPEN_LOBBY.lower() in ("yes", "true", "t", "1")
