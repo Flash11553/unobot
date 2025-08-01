@@ -1,0 +1,207 @@
+# UNO Bot Azərbaycan Dili Tərcüməsi
+# Translators: OpenAI & User, 2025
+msgid ""
+msgstr ""
+"Project-Id-Version: uno_bot 1.0\n"
+"Report-Msgid-Bugs-To: uno@jhoeke.de\n"
+"POT-Creation-Date: 2019-08-28 14:21+0800\n"
+"PO-Revision-Date: 2025-07-31 18:00+0400\n"
+"Last-Translator: OpenAI ChatGPT\n"
+"Language-Team: Azerbaijani\n"
+"Language: az\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: actions.py:48
+#, python-brace-format
+msgid "Waiting time to skip this player has been reduced to {time} seconds.\nNext player: {name}"
+msgstr "Bu oyunçunu keçmək üçün gözləmə müddəti {time} saniyəyə endirildi.\nNövbəti oyunçu: {name}"
+
+#: actions.py:54 actions.py:69
+#, python-brace-format
+msgid "{player} was skipped! "
+msgstr "{player} turu ötürdü!"
+
+#: actions.py:64
+#, python-brace-format
+msgid "{name1} ran out of time and has been removed from the game!\nNext player: {name2}"
+msgstr "{name1} vaxtında oynamadı və oyundan çıxarıldı!\nNövbəti oyunçu: {name2}"
+
+#: actions.py:76
+#, python-brace-format
+msgid "{name} ran out of time and has been removed from the game!\nThe game ended."
+msgstr "{name} vaxtında oynamadı və oyundan çıxarıldı!\nOyun bitdi."
+
+#: actions.py:101
+msgid "Please choose a color"
+msgstr "Zəhmət olmasa bir rəng seçin"
+
+#: actions.py:108
+#, python-brace-format
+msgid "{name} won!"
+msgstr "{name} qalib gəldi!"
+
+#: actions.py:123 bot.py:119 bot.py:199 bot.py:261 bot.py:340
+msgid "Game ended!"
+msgstr "Oyun bitdi!"
+
+#: actions.py:141 actions.py:165 actions.py:179
+msgid "There are no more cards in the deck."
+msgstr "Dəstədə daha kart qalmayıb."
+
+#: actions.py:157
+#, python-brace-format
+msgid "Bluff called! Giving 4 cards to {name}"
+msgstr "Blöf aşkarlandı! {name} 4 kart alır"
+
+#: actions.py:171
+#, python-brace-format
+msgid "{name1} didn't bluff! Giving 6 cards to {name2}"
+msgstr "{name1} blöf etməmişdi! {name2} 6 kart alır"
+
+#: bot.py:60
+msgid "Send this command in a group to be notified when a new game is started there."
+msgstr "Bu əmri qrupda göndər ki, orada yeni oyun başladıqda bildiriş alasınız."
+
+#: bot.py:83
+#, python-brace-format
+msgid "A new game has been started in {title}"
+msgstr "{title} qrupunda yeni oyun başlandı"
+
+#: bot.py:93
+msgid "Created a new game! Join the game with /join and start the game with /start"
+msgstr "Yeni oyun yaradıldı! /join ilə qatıl və /start ilə başla"
+
+#: bot.py:110 bot.py:433 bot.py:461 bot.py:488 bot.py:516
+msgid "There is no running game in this chat."
+msgstr "Bu söhbətdə aktiv oyun yoxdur."
+
+#: bot.py:123 bot.py:239
+msgid "The game is not started yet. Join the game with /join and start the game with /start"
+msgstr "Oyun hələ başlamayıb. /join ilə qoşul və /start ilə başla"
+
+#: bot.py:129 bot.py:281 bot.py:446 bot.py:473 bot.py:501 bot.py:530
+#, python-brace-format
+msgid "Only the game creator ({name}) and admin can do that."
+msgstr "Bunu yalnız oyun yaradan ({name}) və admin edə bilər."
+
+#: bot.py:146
+msgid "The lobby is closed"
+msgstr "Girişlər bağlandı"
+
+#: bot.py:150 bot.py:232
+msgid "No game is running at the moment. Create a new game with /new"
+msgstr "Hazırda oyun yoxdur. /new ilə yeni oyun yarat"
+
+#: bot.py:156
+msgid "You already joined the game. Start the game with /start"
+msgstr "Artıq oyuna qoşulmusan. /start ilə oyunu başlat"
+
+#: bot.py:162
+msgid "There are not enough cards left in the deck for new players to join."
+msgstr "Yeni oyunçular üçün dəstədə kifayət qədər kart yoxdur."
+
+#: bot.py:168
+msgid "Joined the game"
+msgstr "Oyuna qoşuldun"
+
+#: bot.py:181 bot.py:193
+msgid "You are not playing in a game in this group."
+msgstr "Bu qrupda oyunda deyilsiniz."
+
+#: bot.py:204 bot.py:274
+#, python-brace-format
+msgid "Okay. Next Player: {name}"
+msgstr "Oldu. Növbəti oyunçu: {name}"
+
+#: bot.py:210
+#, python-brace-format
+msgid "{name} left the game before it started."
+msgstr "{name} oyun başlamadan çıxdı."
+
+#: bot.py:253
+#, python-brace-format
+msgid "Player {name} is not found in the current game."
+msgstr "Oyunçu {name} bu oyunda yoxdur."
+
+#: bot.py:260 bot.py:265
+#, python-brace-format
+msgid "{0} was kicked by {1}"
+msgstr "{0}, {1} tərəfindən oyundan çıxarıldı!"
+
+#: bot.py:269
+msgid "Please reply to the person you want to kick and type /kick again."
+msgstr "Zəhmət olmasa, çıxarmaq istədiyiniz oyunçunun mesajına cavab verib /kick yazın."
+
+#: bot.py:299
+msgid "Game not found."
+msgstr "Oyun tapılmadı."
+
+#: bot.py:304
+msgid "Back to last group"
+msgstr "Son qrupa qayıt"
+
+#: bot.py:307
+msgid "Please switch to the group you selected!"
+msgstr "Zəhmət olmasa, seçdiyiniz qrupa keçin!"
+
+#: bot.py:313
+#, python-brace-format
+msgid "Selected group: {group}\n<b>Make sure that you switch to the correct group!</b>"
+msgstr "Seçilmiş qrup: {group}\n<b>Doğru qrupa keçdiyinizdən əmin olun!</b>"
+
+#: bot.py:343
+#, python-brace-format
+msgid "Removing {name} from the game"
+msgstr "{name} oyundan çıxarılır"
+
+#: bot.py:360
+msgid "There is no game running in this chat. Create a new one with /new"
+msgstr "Bu söhbətdə oyun yoxdur. /new ilə yeni bir oyun başlada bilərsən."
+
+#: bot.py:365
+msgid "The game has already started"
+msgstr "Oyun artıq başlayıb!"
+
+#: bot.py:369
+#, python-brace-format
+msgid "At least {minplayers} players must /join the game before you can start it"
+msgstr "Oyun başlatmaq üçün ən az {minplayers} oyunçu /join ilə qatılmalıdır."
+
+#: bot.py:380
+#, python-brace-format
+msgid "First player: {name}\nUse /close to stop people from joining the game.\nEnable multi-translations with /enable_translations"
+msgstr "İlk oyunçu: {name}\nOyunçuların qatılmasını dayandırmaq üçün /close yaz.\nÇoxdilli rejimi aktivləşdirmək üçün /enable_translations istifadə et."
+
+#: bot.py:417
+msgid "Please select the group you want to play in."
+msgstr "Zəhmət olmasa, oynamaq istədiyiniz qrupu seçin."
+
+#: bot.py:440
+msgid "Closed the lobby. No more players can join this game."
+msgstr "Girişlər bağlandı. Artıq heç kim bu oyuna qoşula bilməz."
+
+#: bot.py:468
+msgid "Opened the lobby. New players may /join the game."
+msgstr "Girişlər açıldı. Yeni oyunçular /join ilə oyuna qoşula bilər."
+
+#: bot.py:495
+msgid "Enabled multi-translations. Disable with /disable_translations"
+msgstr "Çoxdilli rejim aktivləşdirildi. Söndürmək üçün /disable_translations yaz."
+
+#: bot.py:523
+msgid "Disabled multi-translations. Enable them again with /enable_translations"
+msgstr "Çoxdilli rejim söndürüldü. Yenidən aktivləşdirmək üçün /enable_translations yaz."
+
+#: bot.py:546
+msgid "You are not playing in a game in this chat."
+msgstr "Bu söhbətdəki bir oyunda oynamırsan."
+
+#: bot.py:561
+#, python-brace-format
+msgid "Please wait {time} second"
+msgid_plural "Please wait {time} seconds"
+msgstr[0] "Zəhmət olmasa {time} saniyə gözləyin"
+msgstr[1] "Zəhmət olmasa {time} saniyə gözləyin"
