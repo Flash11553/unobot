@@ -29,41 +29,26 @@ from promotions import send_promotion
 @user_locale
 def help_handler(update: Update, context: CallbackContext):
     """Handler for the /help command"""
-    help_text = _("Followdkdj these steps:\n\n"
-      "1. Add this bot to a group\n"
-      "2. In the group, start a new game with /new or join an already"
-      " running game with /join\n"
-      "3. After at least two players have joined, start the game with"
-      " /start\n"
-      "4. Type <code>@unobot</code> into your chat box and hit "
-      "<b>space</b>, or click the <code>via @unobot</code> text "
-      "next to messages. You will see your cards (some greyed out), "
-      "any extra options like drawing, and a <b>?</b> to see the "
-      "current game state. The <b>greyed out cards</b> are those you "
-      "<b>can not play</b> at the moment. Tap an option to execute "
-      "the selected action.\n"
-      "Players can join the game at any time. To leave a game, "
-      "use /leave. If a player takes more than 90 seconds to play, "
-      "you can use /skip to skip that player. Use /notify_me to "
-      "receive a private message when a new game is started.\n\n"
-      "<b>Language</b> and other settings: /settings\n"
-      "Other commands (only game creator):\n"
-      "/close - Close lobby\n"
-      "/open - Open lobby\n"
-      "/kill - Terminate the game\n"
-      "/kick - Select a player to kick "
-      "by replying to him or her\n"
-      "/enable_translations - Translate relevant texts into all "
-      "languages spoken in a game\n"
-      "/disable_translations - Use English for those texts\n\n"
-      "<b>Experimental:</b> Play in multiple groups at the same time. "
-      "Press the <code>Current game: ...</code> button and select the "
-      "group you want to play a card in.\n"
-      "If you enjoy this bot, "
-      "<a href=\"https://telegram.me/storebot?start=mau_mau_bot\">"
-      "rate me</a>, join the "
-      "<a href=\"https://telegram.me/unobotnews\">update channel</a>"
-      " and buy an UNO card game.")
+    help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
+"\n"
+"1️⃣ Bu botu qrupunuza əlavə edin\n"
+"2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun\n"
+"3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın\n"
+"4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
+"\n"
+"👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
+"🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
+"⏱ Əgər bir oyunçu 60 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
+"🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
+"\n"
+"⚙️ Ayarlar və Dil Dəyişikliyi üçün:\n"
+"💬 /settings — dili dəyiş və əlavə parametrləri tənzimlə\n"
+"\n"
+"🔐 Yalnız oyun yaradıcısı üçün əmr(lər):\n"
+"🚫 /close — Oyuna girişləri bağla\n"
+"✅ /open — Oyuna girişləri aç\n"
+"🛑 /stop — Oyunu dayandır\n"
+"👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver\n")
 
     def _send():
       update.message.chat.send_message(
@@ -155,6 +140,6 @@ def stats(update: Update, context: CallbackContext):
 def register():
     dispatcher.add_handler(CommandHandler('help', help_handler))
     dispatcher.add_handler(CommandHandler('yrjrj', source))
-    dispatcher.add_handler(CommandHandler('news', news))
+    dispatcher.add_handler(CommandHandler('newsdusi', news))
     dispatcher.add_handler(CommandHandler('stats', stats))
-    dispatcher.add_handler(CommandHandler('modes', modes))
+    dispatcher.add_handler(CommandHandler('modesdkdk', modes))
