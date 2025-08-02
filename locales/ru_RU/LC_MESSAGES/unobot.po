@@ -240,15 +240,13 @@ msgid "Card (tap for game state):"
 msgid_plural "Cards (tap for game state):"
 msgstr[0] "Карта (нажмите для состояния игры):"
 msgstr[1] "Карты (нажмите для состояния игры):"
-msgstr[2] "Карт (нажмите для состояния игры):"
 
 #: results.py:64
 #, python-brace-format
 msgid "{name} ({number} card)"
 msgid_plural "{name} ({number} cards)"
 msgstr[0] "{name} ({number} карта)"
-msgstr[1] "{name} ({number} карты)"
-msgstr[2] "{name} ({number} карт)"
+msgstr[1] "{name} ({number} карт)"
 
 #: results.py:76
 msgid "You are not playing"
