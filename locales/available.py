@@ -32,6 +32,5 @@ available_locales = {
     "en_US": flag("US") + " English (US)",
     "ru_RU": flag("RU") + " Русский язык",
     "tr_TR": flag("TR") + " Türkçe",
-    "hn_IN": flag("IN") + " Hindi",
     "uz_UZ": flag("UZ") + " O'zbek",
 }
