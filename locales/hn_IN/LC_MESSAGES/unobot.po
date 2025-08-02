@@ -3,16 +3,16 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: uno_bot 1.0\n"
-"Report‑Msgid‑Bugs‑To: uno@jhoeke.de\n"
-"POT‑Creation‑Date: 2019‑08‑28 14:21+0800\n"
-"PO‑Revision‑Date: 2025‑07‑31 18:00+0400\n"
-"Last‑Translator: OpenAI ChatGPT\n"
-"Language‑Team: Hindi\n"
+"Report-Msgid-Bugs-To: uno@jhoeke.de\n"
+"POT-Creation-Date: 2019-08-28 14:21+0800\n"
+"PO-Revision-Date: 2025-07-31 18:00+0400\n"
+"Last-Translator: OpenAI ChatGPT\n"
+"Language-Team: Hindi\n"
 "Language: hi\n"
-"MIME‑Version: 1.0\n"
-"Content‑Type: text/plain; charset=UTF-8\n"
-"Content‑Transfer‑Encoding: 8bit\n"
-"Plural‑Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: actions.py:48
 #, python‑brace‑format
@@ -490,4 +490,5 @@ msgstr "{emoji} हरा"
 #: utils.py:61 utils.py:76
 msgid "{emoji} Yellow"
 msgstr "{emoji} पीला"
+
 
