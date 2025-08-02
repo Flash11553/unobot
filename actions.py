@@ -75,9 +75,7 @@ def do_skip(bot, player, job_queue=None):
 
         except NotEnoughPlayersError:
             send_async(bot, chat.id,
-                       text=__("{name} ran out of time "
-                               "and has been removed from the game!\n"
-                               "The game ended.", multi=game.translate)
+                       text=__("{name} "{name} vaxtı bitdi" "və oyundan çıxarıldı!\n"Oyun bitdi."", multi=game.translate)
                        .format(name=display_name(skipped_player.user)))
 
             gm.end_game(chat, skipped_player.user)
@@ -85,7 +83,7 @@ def do_skip(bot, player, job_queue=None):
 
 
 def do_play_card(bot, player, result_id):
-    """Plays the selected card and sends an update to the group if needed"""
+    """Seçilmiş kartı masaya qoyur və ehtiyac olarsa, qrupa oyun vəziyyəti ilə bağlı məlumat göndərir."""
     card = c.from_str(result_id)
     player.play(card)
     game = player.game
@@ -100,14 +98,14 @@ def do_play_card(bot, player, result_id):
         us.cards_played += 1
 
     if game.choosing_color:
-        send_async(bot, chat.id, text=__("Please choose a color", multi=game.translate))
+        send_async(bot, chat.id, text=__("Zəhmət olmasa reng seçin", multi=game.translate))
 
     if len(player.cards) == 1:
         send_async(bot, chat.id, text="UNO!")
 
     if len(player.cards) == 0:
         send_async(bot, chat.id,
-                   text=__("{name} won!", multi=game.translate)
+                   text=__("{name} qalib gəldi!", multi=game.translate)
                    .format(name=user.first_name))
 
         if us.stats:
@@ -122,7 +120,7 @@ def do_play_card(bot, player, result_id):
             gm.leave_game(user, chat)
         except NotEnoughPlayersError:
             send_async(bot, chat.id,
-                       text=__("Game ended!", multi=game.translate))
+                       text=__("Oyun Bitdi!", multi=game.translate))
 
             us2 = UserSetting.get(id=game.current_player.user.id)
             if us2 and us2.stats:
@@ -132,7 +130,7 @@ def do_play_card(bot, player, result_id):
 
 
 def do_draw(bot, player):
-    """Does the drawing"""
+    """Kart çekir"""
     game = player.game
     draw_counter_before = game.draw_counter
 
@@ -140,7 +138,7 @@ def do_draw(bot, player):
         player.draw()
     except DeckEmptyError:
         send_async(bot, player.game.chat.id,
-                   text=__("There are no more cards in the deck.",
+                   text=__("Əlinizdə kart qalmayıb artıq.",
                            multi=game.translate))
 
     if (game.last_card.value == c.DRAW_TWO or
@@ -150,13 +148,13 @@ def do_draw(bot, player):
 
 
 def do_call_bluff(bot, player):
-    """Handles the bluff calling"""
+    """Blöfün yoxlanılmasını təmin edir"""
     game = player.game
     chat = game.chat
 
     if player.prev.bluffing:
         send_async(bot, chat.id,
-                   text=__("Bluff called! Giving 4 cards to {name}",
+                   text=__("Blöf aşkar olundu! 4 kart verilir oyunçuya: {name}",
                            multi=game.translate)
                    .format(name=player.prev.user.first_name))
 
@@ -164,13 +162,13 @@ def do_call_bluff(bot, player):
             player.prev.draw()
         except DeckEmptyError:
             send_async(bot, player.game.chat.id,
-                       text=__("There are no more cards in the deck.",
+                       text=__("Əlinizdə kart qalmayıb artıq.",
                                multi=game.translate))
 
     else:
         game.draw_counter += 2
         send_async(bot, chat.id,
-                   text=__("{name1} didn't bluff! Giving 6 cards to {name2}",
+                   text=__("{name1} Blöf etmə! 6 kart verilir oyunçuya: {name2}",
                            multi=game.translate)
                    .format(name1=player.prev.user.first_name,
                            name2=player.user.first_name))
@@ -178,7 +176,7 @@ def do_call_bluff(bot, player):
             player.draw()
         except DeckEmptyError:
             send_async(bot, player.game.chat.id,
-                       text=__("There are no more cards in the deck.",
+                       text=__("Əlinizdə kart qalmayıb artıq.",
                                multi=game.translate))
 
     game.turn()
@@ -205,7 +203,7 @@ def start_player_countdown(bot, game, job_queue):
             context=Countdown(player, job_queue)
         )
 
-        logger.info("Started countdown for player: {player}. {time} seconds."
+        logger.info("Geri sayım başladı oyunçu üçün: {player}. {time} saniyə."
                     .format(player=display_name(player.user), time=time))
         player.game.job = job
 
