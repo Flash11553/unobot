@@ -204,8 +204,7 @@ msgstr "Вы не играете в этой игре в этом чате."
 msgid "Please wait {time} second"
 msgid_plural "Please wait {time} seconds"
 msgstr[0] "Пожалуйста, подождите {time} секунду"
-msgstr[1] "Пожалуйста, подождите {time} секунды"
-msgstr[2] "Пожалуйста, подождите {time} секунд"
+msgstr[1] "Пожалуйста, подождите {time} секунд"
 
 #: bot.py:637
 #, python-brace-format
@@ -297,7 +296,6 @@ msgid "Drawing {number} card"
 msgid_plural "Drawing {number} cards"
 msgstr[0] "Берётся {number} карта"
 msgstr[1] "Берётся {number} карты"
-msgstr[2] "Берётся {number} карт"
 
 #: results.py:167
 msgid "Pass"
@@ -323,7 +321,6 @@ msgid "Player: {player_list}"
 msgid_plural "Players: {player_list}"
 msgstr[0] "Игрок: {player_list}"
 msgstr[1] "Игроки: {player_list}"
-msgstr[2] "Игроков: {player_list}"
 
 #: settings.py:37
 msgid "Please edit your settings in a private chat with the bot."
