@@ -75,7 +75,7 @@ def do_skip(bot, player, job_queue=None):
 
         except NotEnoughPlayersError:
             send_async(bot, chat.id,
-                       text=__("{name} "{name} vaxtı bitdi" "və oyundan çıxarıldı!\n"Oyun bitdi."", multi=game.translate)
+                       text=__("{name} vaxtı bitdi və oyundan çıxarıldı!\nOyun bitdi.", multi=game.translate)
                        .format(name=display_name(skipped_player.user)))
 
             gm.end_game(chat, skipped_player.user)
