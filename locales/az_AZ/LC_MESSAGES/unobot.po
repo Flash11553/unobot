@@ -391,25 +391,26 @@ msgid ""
 "start=mau_mau_bot\">rate me</a>, join the <a href=\"https://telegram.me/"
 "unobotnews\">update channel</a> and buy an UNO card game."
 msgstr ""
-"Bu addımları izləyin:\n"
-"\n"
-"1. Bu botu bir qrupa əlavə edin\n"
-"2. Qrupda /new ilə yeni oyun başladın və ya /join ilə mövcud oyuna qoşulun\n"
-"3. Ən azı iki oyunçu qoşulduqdan sonra /start ilə oyunu başladın\n"
-"4. Söhbət qutusuna <code>@unobot</code> yazıb <b>boşluq</b> düyməsinə basın və ya mesajların yanındakı <code>via @unobot</code> yazısına klikləyin. Orada kartlarınızı (bəziləri boz şəkildə), əlavə seçimləri (məsələn, kart çəkmək) və <b>?</b> işarəsi ilə cari oyun vəziyyətini görəcəksiniz. <b>Boz kartlar</b> o anda <b>oynaya bilmədiyiniz</b> kartlardır. Hərəkət etmək üçün bir seçimin üzərinə toxunun.\n"
-"Oyuna istənilən vaxt yeni oyunçular qoşula bilər. Oyundan çıxmaq üçün /leave yazın. Əgər bir oyunçu 90 saniyədən çox gözlədilərsə, /skip ilə onu keçə bilərsiniz. Yeni oyun başladıqda bildiriş almaq üçün /notify_me istifadə edin.\n"
-"\n"
-"<b>Dil</b> və digər ayarlar üçün: /settings\n"
-"Digər komutlar (yalnız oyun yaradıcısı üçün):\n"
-"/close - Girişləri bağla\n"
-"/open - Girişləri aç\n"
-"/kill - Oyunu sonlandır\n"
-"/kick - Oyunçunu çıxarmaq üçün onun mesajına cavab verin\n"
-"/enable_translations - Oyunda danışılan dillərə uyğun tərcüməni aktiv et\n"
-"/disable_translations - İngilis dilində göstər\n"
-"\n"
-"<b>Eksperimental:</b> Eyni anda bir neçə qrupda oyna. <code>Hazırkı oyun: ...</code> düyməsinə klikləyib oynamalı olduğunuz qrupu seçin.\n"
-Əgər bu botu bəyəndinizsə, <a href=\"https://telegram.me/storebot?start=mau_mau_bot\">qiymətləndirin</a>, <a href=\"https://telegram.me/unobotnews\">yeniliklər kanalına qoşulun</a> və UNO kart oyununu alın."
+🎮 UNO Oyununa Xoş Gəlmisiniz:
+
+1️⃣ Bu botu qrupunuza əlavə edin
+2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun
+3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın
+4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun
+
+👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər
+🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın
+⏱ Əgər bir oyunçu 60 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz
+🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın
+
+⚙️ Ayarlar və Dil Dəyişikliyi üçün:
+💬 /settings — dili dəyiş və əlavə parametrləri tənzimlə
+
+🔐 Yalnız oyun yaradıcısı üçün əmr(lər):
+🚫 /close — Oyuna girişləri bağla
+✅ /open — Oyuna girişləri aç
+🛑 /stop — Oyunu dayandır
+👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver
 
 #: simple_commands.py:73
 msgid ""
