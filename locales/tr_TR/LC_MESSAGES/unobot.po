@@ -419,26 +419,26 @@ msgid ""
 "start=mau_mau_bot\">rate me</a>, join the <a href=\"https://telegram.me/"
 "unobotnews\">update channel</a> and buy an UNO card game."
 msgstr ""
-🎮 UNO Oyununa Xoş Gəlmisiniz:
-
-1️⃣ Bu botu qrupunuza əlavə edin
-2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun
-3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın
-4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun
-
-👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər
-🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın
-⏱ Əgər bir oyunçu 60 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz
-🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın
-
-⚙️ Ayarlar və Dil Dəyişikliyi üçün:
-💬 /settings — dili dəyiş və əlavə parametrləri tənzimlə
-
-🔐 Yalnız oyun yaradıcısı üçün əmr(lər):
-🚫 /close — Oyuna girişləri bağla
-✅ /open — Oyuna girişləri aç
-🛑 /stop — Oyunu dayandır
-👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver
+"🎮 UNO Oyununa Hoş Geldiniz:\n"
+"\n"
+"1️⃣ Bu botu grubunuza ekleyin\n"
+"2️⃣ Grupta /new yazarak yeni bir oyun oluşturun ya da /join ile mevcut oyuna katılın\n"
+"3️⃣ En az 2 oyuncu katıldıktan sonra /start yazarak oyunu başlatın\n"
+"4️⃣ Oyun başladığında 🃏 kartlarınızdan birine dokunarak hamlenizi yapın\n"
+"\n"
+"👥 Oyuna dilediğiniz zaman yeni oyuncular katılabilir\n"
+"🚪 Oyundan çıkmak isterseniz /leave yazın\n"
+"⏱ Eğer bir oyuncu 60 saniyeden fazla bekleniyorsa, onu /skip komutu ile geçebilirsiniz\n"
+"🔔 Yeni bir oyun başladığında bildirim almak için /notify_me yazmayı unutmayın\n"
+"\n"
+"⚙️ Ayarlar ve Dil Değişikliği için:\n"
+"💬 /settings — dili değiştirin ve diğer ayarları yapın\n"
+"\n"
+"🔐 Sadece oyun kurucusu için komutlar:\n"
+"🚫 /close — Oyuna katılımı kapat\n"
+"✅ /open — Oyuna katılımı aç\n"
+"🛑 /stop — Oyunu durdur\n"
+"👢 /kick — Bir oyuncuyu oyundan atmak için mesajına yanıt verin\n"
 
 #: simple_commands.py:73
 msgid ""
