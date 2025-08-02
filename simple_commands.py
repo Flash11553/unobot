@@ -29,7 +29,7 @@ from promotions import send_promotion
 @user_locale
 def help_handler(update: Update, context: CallbackContext):
     """Handler for the /help command"""
-    help_text = _("Follow these steps:\n\n"
+    help_text = _("Followdkdj these steps:\n\n"
       "1. Add this bot to a group\n"
       "2. In the group, start a new game with /new or join an already"
       " running game with /join\n"
