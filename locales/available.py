@@ -28,6 +28,7 @@ def flag(code):
 
 
 available_locales = {
+    "az_AZ": flag("AZ") + " Azərbaycan dili ",
     "en_US": flag("US") + " English (US)",
     "ru_RU": flag("RU") + " Русский язык",
     "tr_TR": flag("TR") + " Türkçe",
