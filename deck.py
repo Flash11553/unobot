@@ -38,14 +38,14 @@ class Deck(object):
 
     def shuffle(self):
         """Shuffles the deck"""
-        self.logger.debug("Shuffling Deck")
+        self.logger.debug("Kartları qarışdırır")
         shuffle(self.cards)
 
     def draw(self):
         """Draws a card from this deck"""
         try:
             card = self.cards.pop()
-            self.logger.debug("Drawing card " + str(card))
+            self.logger.debug("Kart Çekilir" + str(card))
             return card
         except IndexError:
             if len(self.graveyard):
