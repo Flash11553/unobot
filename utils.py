@@ -52,28 +52,28 @@ def display_name(user):
 def display_color(color):
     """ Convert a color code to actual color name """
     if color == "r":
-        return _("{emoji} Red").format(emoji='❤️')
+        return _("{emoji} Qırmızı").format(emoji='❤️')
     if color == "b":
-        return _("{emoji} Blue").format(emoji='💙')
+        return _("{emoji} Mavi").format(emoji='💙')
     if color == "g":
-        return _("{emoji} Green").format(emoji='💚')
+        return _("{emoji} Yaşıl").format(emoji='💚')
     if color == "y":
-        return _("{emoji} Yellow").format(emoji='💛')
+        return _("{emoji} Sarı").format(emoji='💛')
 
 
 def display_color_group(color, game):
     """ Convert a color code to actual color name """
     if color == "r":
-        return __("{emoji} Red", game.translate).format(
+        return __("{emoji} Qırmızı", game.translate).format(
             emoji='❤️')
     if color == "b":
-        return __("{emoji} Blue", game.translate).format(
+        return __("{emoji} Mavi", game.translate).format(
             emoji='💙')
     if color == "g":
-        return __("{emoji} Green", game.translate).format(
+        return __("{emoji} Yaşıl", game.translate).format(
             emoji='💚')
     if color == "y":
-        return __("{emoji} Yellow", game.translate).format(
+        return __("{emoji} Sarı", game.translate).format(
             emoji='💛')
 
 
