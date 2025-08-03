@@ -46,17 +46,17 @@ SIX = '6'
 SEVEN = '7'
 EIGHT = '8'
 NINE = '9'
-DRAW_TWO = 'kart götür'
-REVERSE = 'əks istiqamət'
-SKIP = 'keçir'
+DRAW_TWO = 'draw'
+REVERSE = 'reverse'
+SKIP = 'skip'
 
 VALUES = (ZERO, ONE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, DRAW_TWO,
           REVERSE, SKIP)
 WILD_VALUES = (ONE, TWO, THREE, FOUR, FIVE, DRAW_TWO, REVERSE, SKIP)
 
 # Special cards
-CHOOSE = 'reng seçimi'
-DRAW_FOUR = '+4 kart'
+CHOOSE = 'colorchooser'
+DRAW_FOUR = 'draw_four'
 
 SPECIALS = (CHOOSE, DRAW_FOUR)
 
