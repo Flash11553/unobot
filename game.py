@@ -81,7 +81,7 @@ class Game(object):
 
     def turn(self):
         """Marks the turn as over and change the current player"""
-        self.logger.debug("Next Player")
+        self.logger.debug("Növbəti Oyunçu)
         self.current_player = self.current_player.next
         self.current_player.drew = False
         self.current_player.turn_started = datetime.now()
@@ -110,15 +110,15 @@ class Game(object):
         self.deck.dismiss(self.last_card)
         self.last_card = card
 
-        self.logger.info("Playing card " + repr(card))
+        self.logger.info("Oynanılan kart " + repr(card))
         if card.value == c.SKIP:
             self.turn()
         elif card.special == c.DRAW_FOUR:
             self.draw_counter += 4
-            self.logger.debug("Draw counter increased by 4")
+            self.logger.debug("Çəkilən kartların sayı 4 ə artırıldı")
         elif card.value == c.DRAW_TWO:
             self.draw_counter += 2
-            self.logger.debug("Draw counter increased by 2")
+            self.logger.debug("Çəkilən kartların sayı 2 ə artırıldı")
         elif card.value == c.REVERSE:
             # Special rule for two players
             if self.current_player == self.current_player.next.next:
@@ -130,7 +130,7 @@ class Game(object):
         if card.special not in (c.CHOOSE, c.DRAW_FOUR):
             self.turn()
         else:
-            self.logger.debug("Choosing Color...")
+            self.logger.debug("Rəng Seçilir...")
             self.choosing_color = True
 
     def choose_color(self, color):
