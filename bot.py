@@ -91,7 +91,7 @@ def new_game(update: Update, context: CallbackContext):
         game.owner.add(update.message.from_user.id)
         game.mode = DEFAULT_GAMEMODE
         send_async(context.bot, chat_id,
-                   text=_("Yeni Oyun başlayır! Oyuna qoşulmaq üçün/join "
+                   text=_("Yeni Oyun başlayır! Oyuna qoşulmaq üçün /join "
                           "və oyuna start etmək üçün /start"))
 
 
@@ -122,7 +122,7 @@ def kill_game(update: Update, context: CallbackContext):
         except NoGameInChatError:
             send_async(context.bot, chat.id,
                        text=_("The game is not started yet. "
-                              "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün  /start"),
+                              "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün /start"),
                        reply_to_message_id=update.message.message_id)
 
     else:
@@ -179,8 +179,8 @@ def leave_game(update: Update, context: CallbackContext):
     player = gm.player_for_user_in_chat(user, chat)
 
     if player is None:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız oyunda "
-                                        "bu qrupda."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki "
+                                        "oyunda."),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -191,8 +191,8 @@ def leave_game(update: Update, context: CallbackContext):
         gm.leave_game(user, chat)
 
     except NoGameInChatError:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız oyunda"
-                                        "bu qrupda."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki"
+                                        "oyunda."),
                    reply_to_message_id=update.message.message_id)
 
     except NotEnoughPlayersError:
@@ -231,7 +231,7 @@ def kick_player(update: Update, context: CallbackContext):
     except (KeyError, IndexError):
             send_async(context.bot, chat.id,
                    text=_("Hal-hazırda heç bir oyun davam etmir."
-                          "Yeni oyun yaradın /new"),
+                          "Yeni oyun yaradın /new ilə"),
                    reply_to_message_id=update.message.message_id)
             return
 
@@ -357,8 +357,8 @@ def start_game(update: Update, context: CallbackContext):
             game = gm.chatid_games[chat.id][-1]
         except (KeyError, IndexError):
             send_async(context.bot, chat.id,
-                       text=_("Heç bir Oyun oynanılmır qrupda indi. Yarat "
-                              "yeni birin /new"))
+                       text=_("Heç bir Oyun oynanılmır qrupda indi. Yeni  "
+                              "birin yarat /new ilə"))
             return
 
         if game.started:
