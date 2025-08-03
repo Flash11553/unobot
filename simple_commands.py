@@ -38,7 +38,7 @@ def help_handler(update: Update, context: CallbackContext):
 "\n"
 "👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
 "🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
-"⏱ Əgər bir oyunçu 60 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
+"⏱ Əgər bir oyunçu 120 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
 "🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
 "\n"
 "⚙️ Statiskanızı görmək üçün:\n"
