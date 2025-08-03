@@ -106,8 +106,7 @@ def stats(update: Update, context: CallbackContext):
     us = UserSetting.get(id=user.id)
     if not us:
         send_async(context.bot, update.message.chat_id,
-                   text=_("You did not enable statistics. Use /settings in "
-                          "a private chat with the bot to enable them."))
+                   text=_("Sizin Statistikanız hələ mövcud deyil. Əvvəlcə bir oyun oynamaq lazımdır."))
     else:
         stats_text = list()
 
@@ -129,7 +128,7 @@ def stats(update: Update, context: CallbackContext):
         n = us.cards_played
         stats_text.append(
             _("{number} kart oynanılıb",
-              "{number} kartlar oynanılıb",
+              "{number} kart oynanılıb",
               n).format(number=n)
         )
 
