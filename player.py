@@ -136,7 +136,7 @@ class Player(object):
         playable = list()
         last = self.game.last_card
 
-        self.logger.debug("Last card was " + str(last))
+        self.logger.debug("Sonuncu kart oldu" + str(last))
 
         cards = self.cards
         if self.drew:
@@ -146,7 +146,7 @@ class Player(object):
         self.bluffing = False
         for card in cards:
             if self._card_playable(card):
-                self.logger.debug("Matching!")
+                self.logger.debug("Uyğunlaşır!")
                 playable.append(card)
 
                 self.bluffing = (self.bluffing or card.color == last.color)
@@ -162,25 +162,25 @@ class Player(object):
 
         is_playable = True
         last = self.game.last_card
-        self.logger.debug("Checking card " + str(card))
+        self.logger.debug("Kart yoxlanılır " + str(card))
 
         if (card.color != last.color and card.value != last.value and
                 not card.special):
-            self.logger.debug("Card's color or value doesn't match")
+            self.logger.debug("Kartın rəngi və ya rəqəmi uyğun gəlmir")
             is_playable = False
         elif last.value == c.DRAW_TWO and not \
                 card.value == c.DRAW_TWO and self.game.draw_counter:
-            self.logger.debug("Player has to draw and can't counter")
+            self.logger.debug("Oyuçu kart çəkməlidir və qarşılıq verə bilməz")
             is_playable = False
         elif last.special == c.DRAW_FOUR and self.game.draw_counter:
-            self.logger.debug("Player has to draw and can't counter")
+            self.logger.debug("Oyuçu kart çəkməlidir və qarşılıq verə bilməz")
             is_playable = False
         elif (last.special == c.CHOOSE or last.special == c.DRAW_FOUR) and \
                 (card.special == c.CHOOSE or card.special == c.DRAW_FOUR):
-            self.logger.debug("Can't play colorchooser on another one")
+            self.logger.debug("Reng seçici kartı başqa karta oynamaq olmaz")
             is_playable = False
         elif not last.color:
-            self.logger.debug("Last card has no color")
+            self.logger.debug("Sonuncu kartın rəngi düz deyil")
             is_playable = False
 
         return is_playable
