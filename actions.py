@@ -47,13 +47,13 @@ def do_skip(bot, player, job_queue=None):
 
         n = skipped_player.waiting_time
         send_async(bot, chat.id,
-                   text=__("Waiting time to skip this player has "
-                        "been reduced to {time} seconds.\n"
-                        "Next player: {name}", multi=game.translate)
+                   text=__("Bu oyunçunu keçmək üçün vaxt"
+                        "azaldı {time} saniyə.\n"
+                        "Növbəti oyunçu: {name}", multi=game.translate)
                    .format(time=n,
                            name=display_name(next_player.user))
         )
-        logger.info("{player} was skipped! "
+        logger.info("{player} keçildi! "
                     .format(player=display_name(player.user)))
         game.turn()
         if job_queue:
@@ -63,12 +63,12 @@ def do_skip(bot, player, job_queue=None):
         try:
             gm.leave_game(skipped_player.user, chat)
             send_async(bot, chat.id,
-                       text=__("{name1} ran out of time "
-                            "and has been removed from the game!\n"
-                            "Next player: {name2}", multi=game.translate)
+                       text=__("{name1} vaxtı bitdi"
+                            "və oyundan kənarlaşdırıldı!\n"
+                            "Növbəti oyuçu: {name2}", multi=game.translate)
                        .format(name1=display_name(skipped_player.user),
                                name2=display_name(next_player.user)))
-            logger.info("{player} was skipped! "
+            logger.info("{player} keçildi! "
                     .format(player=display_name(player.user)))
             if job_queue:
                 start_player_countdown(bot, game, job_queue)
