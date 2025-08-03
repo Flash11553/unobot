@@ -43,7 +43,7 @@ class GameManager(object):
         """
         chat_id = chat.id
 
-        self.logger.debug("Creating new game in chat " + str(chat_id))
+        self.logger.debug("Yeni Oyun yaradılır bu Qrupda  " + str(chat_id))
         game = Game(chat)
 
         if chat_id not in self.chatid_games:
@@ -142,7 +142,7 @@ class GameManager(object):
         End a game
         """
 
-        self.logger.info("Game in chat " + str(chat.id) + " ended")
+        self.logger.info("Qrupdaki Oyun" + str(chat.id) + " bitdi")
         send_promotion_async(chat, chance=0.15)
 
         # Find the correct game instance to end
