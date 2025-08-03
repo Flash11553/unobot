@@ -58,8 +58,7 @@ def notify_me(update: Update, context: CallbackContext):
     if update.message.chat.type == 'private':
         send_async(bot,
                    chat_id,
-                   text=_("Send this command in a group to be notified "
-                          "when a new game is started there."))
+                   text=_("Yeni oyun başladıqda xəbərdar olmaq üçün bu əmri bir qrupda göndərin."))
     else:
         try:
             gm.remind_dict[chat_id].add(update.message.from_user.id)
@@ -81,7 +80,7 @@ def new_game(update: Update, context: CallbackContext):
             for user in gm.remind_dict[update.message.chat_id]:
                 send_async(context.bot,
                            user,
-                           text=_("A new game has been started in {title}").format(
+                           text=_("Yeni oyun başlayır {title}").format(
                                 title=update.message.chat.title))
 
             del gm.remind_dict[update.message.chat_id]
@@ -92,8 +91,8 @@ def new_game(update: Update, context: CallbackContext):
         game.owner.add(update.message.from_user.id)
         game.mode = DEFAULT_GAMEMODE
         send_async(context.bot, chat_id,
-                   text=_("Created a new game! Join the game with /join "
-                          "and start the game with /start"))
+                   text=_("Yeni Oyun başlayır! Oyuna qoşulmaq üçün/join "
+                          "və oyuna start etmək üçün /start"))
 
 
 @user_locale
@@ -109,7 +108,7 @@ def kill_game(update: Update, context: CallbackContext):
 
     if not games:
             send_async(context.bot, chat.id,
-                       text=_("There is no running game in this chat."))
+                       text=_("Bu Qrupda heç bir oyun oynanılmır."))
             return
 
     game = games[-1]
@@ -118,17 +117,17 @@ def kill_game(update: Update, context: CallbackContext):
 
         try:
             gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Game ended!", multi=game.translate))
+            send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
 
         except NoGameInChatError:
             send_async(context.bot, chat.id,
                        text=_("The game is not started yet. "
-                              "Join the game with /join and start the game with /start"),
+                              "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün  /start"),
                        reply_to_message_id=update.message.message_id)
 
     else:
         send_async(context.bot, chat.id,
-                  text=_("Only the game creator ({name}) and admin can do that.")
+                  text=_("Ancaq Oyunu başladan ({name}) bu əmri icra edə bilər")
                   .format(name=game.starter.first_name),
                   reply_to_message_id=update.message.message_id)
 
@@ -145,29 +144,29 @@ def join_game(update: Update, context: CallbackContext):
         gm.join_game(update.message.from_user, chat)
 
     except LobbyClosedError:
-            send_async(context.bot, chat.id, text=_("The lobby is closed"))
+            send_async(context.bot, chat.id, text=_("Oyuna qeydiyyat bağlanıb"))
 
     except NoGameInChatError:
         send_async(context.bot, chat.id,
-                   text=_("No game is running at the moment. "
-                          "Create a new game with /new"),
+                   text=_("Heç bir Oyun getmir indi. "
+                          "Yeni oyun yarat bu əmr ilə /new"),
                    reply_to_message_id=update.message.message_id)
 
     except AlreadyJoinedError:
         send_async(context.bot, chat.id,
-                   text=_("You already joined the game. Start the game "
-                          "with /start"),
+                   text=_("Siz artıq oyuna qoşulmusunuz.Oyuna Başla "
+                          "bu əmr ilə /start"),
                    reply_to_message_id=update.message.message_id)
 
     except DeckEmptyError:
         send_async(context.bot, chat.id,
-                   text=_("There are not enough cards left in the deck for "
-                          "new players to join."),
+                   text=_("Əlinizdə kifayət qədər kart qalmayıb"
+                          "yeni oyunçuların qoşuması üçün."),
                    reply_to_message_id=update.message.message_id)
 
     else:
         send_async(context.bot, chat.id,
-                   text=_("Joined the game"),
+                   text=_("Oyuna Qoşuldu"),
                    reply_to_message_id=update.message.message_id)
 
 
@@ -180,8 +179,8 @@ def leave_game(update: Update, context: CallbackContext):
     player = gm.player_for_user_in_chat(user, chat)
 
     if player is None:
-        send_async(context.bot, chat.id, text=_("You are not playing in a game in "
-                                        "this group."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız oyunda "
+                                        "bu qrupda."),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -192,24 +191,24 @@ def leave_game(update: Update, context: CallbackContext):
         gm.leave_game(user, chat)
 
     except NoGameInChatError:
-        send_async(context.bot, chat.id, text=_("You are not playing in a game in "
-                                        "this group."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız oyunda"
+                                        "bu qrupda."),
                    reply_to_message_id=update.message.message_id)
 
     except NotEnoughPlayersError:
         gm.end_game(chat, user)
-        send_async(context.bot, chat.id, text=__("Game ended!", multi=game.translate))
+        send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
 
     else:
         if game.started:
             send_async(context.bot, chat.id,
-                       text=__("Okay. Next Player: {name}",
+                       text=__("Tamam. Növbəti oyunçu: {name}",
                                multi=game.translate).format(
                            name=display_name(game.current_player.user)),
                        reply_to_message_id=update.message.message_id)
         else:
             send_async(context.bot, chat.id,
-                       text=__("{name} left the game before it started.",
+                       text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl .",
                                multi=game.translate).format(
                            name=display_name(user)),
                        reply_to_message_id=update.message.message_id)
@@ -231,15 +230,15 @@ def kick_player(update: Update, context: CallbackContext):
 
     except (KeyError, IndexError):
             send_async(context.bot, chat.id,
-                   text=_("No game is running at the moment. "
-                          "Create a new game with /new"),
+                   text=_("Hal-hazırda heç bir oyun davam etmir."
+                          "Yeni oyun yaradın /new"),
                    reply_to_message_id=update.message.message_id)
             return
 
     if not game.started:
         send_async(context.bot, chat.id,
-                   text=_("The game is not started yet. "
-                          "Join the game with /join and start the game with /start"),
+                   text=_("Oyun hələki başlamayıb. "
+                          "Oyuna qoşulmaq üçün /join və oyunu başladmaq üçün /start"),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -252,35 +251,35 @@ def kick_player(update: Update, context: CallbackContext):
                 gm.leave_game(kicked, chat)
 
             except NoGameInChatError:
-                send_async(context.bot, chat.id, text=_("Player {name} is not found in the current game.".format(name=display_name(kicked))),
+                send_async(context.bot, chat.id, text=_("Oyunçu {name} tapılmadı indiki oyunda.".format(name=display_name(kicked))),
                                 reply_to_message_id=update.message.message_id)
                 return
 
             except NotEnoughPlayersError:
                 gm.end_game(chat, user)
                 send_async(context.bot, chat.id,
-                                text=_("{0} was kicked by {1}".format(display_name(kicked), display_name(user))))
-                send_async(context.bot, chat.id, text=__("Game ended!", multi=game.translate))
+                                text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
+                send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
                 return
 
             send_async(context.bot, chat.id,
-                            text=_("{0} was kicked by {1}".format(display_name(kicked), display_name(user))))
+                            text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
 
         else:
             send_async(context.bot, chat.id,
-                text=_("Please reply to the person you want to kick and type /kick again."),
+                text=_("Oyundan atmaq istədiyiniz şəxsə cavab verin və /kick yazın."),
                 reply_to_message_id=update.message.message_id)
             return
 
         send_async(context.bot, chat.id,
-                   text=__("Okay. Next Player: {name}",
+                   text=__("Tamam. Növbəti oyunçu: {name}",
                            multi=game.translate).format(
                        name=display_name(game.current_player.user)),
                    reply_to_message_id=update.message.message_id)
 
     else:
         send_async(context.bot, chat.id,
-                  text=_("Only the game creator ({name}) and admin can do that.")
+                  text=_("Ancaq Oyunu başladan ({name}) bu əmri icra edə bilər.")
                   .format(name=game.starter.first_name),
                   reply_to_message_id=update.message.message_id)
 
@@ -298,22 +297,22 @@ def select_game(update: Update, context: CallbackContext):
     else:
         send_async(bot,
                    update.callback_query.message.chat_id,
-                   text=_("Game not found."))
+                   text=_("Oyun Tapılmadı."))
         return
 
     def selected():
-        back = [[InlineKeyboardButton(text=_("Back to last group"),
+        back = [[InlineKeyboardButton(text=_("Sonuncu qrupa qayıt"),
                                       switch_inline_query='')]]
         context.bot.answerCallbackQuery(update.callback_query.id,
-                                text=_("Please switch to the group you selected!"),
+                                text=_("Zəhmət olmasa siz seçdiyiniz qrupa çevirin!"),
                                 show_alert=False,
                                 timeout=TIMEOUT)
 
         context.bot.editMessageText(chat_id=update.callback_query.message.chat_id,
                             message_id=update.callback_query.message.message_id,
-                            text=_("Selected group: {group}\n"
-                                   "<b>Make sure that you switch to the correct "
-                                   "group!</b>").format(
+                            text=_("Seçilmiş qrup: {group}\n"
+                                   "<b>Əmin olun ki düzgün qrupa çevirdiz"
+                                   "qrup!</b>").format(
                                 group=gm.userid_current[user_id].game.chat.title),
                             reply_markup=InlineKeyboardMarkup(back),
                             parse_mode=ParseMode.HTML,
@@ -338,10 +337,10 @@ def status_update(update: Update, context: CallbackContext):
             pass
         except NotEnoughPlayersError:
             gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Game ended!",
+            send_async(context.bot, chat.id, text=__("Oyun Bitdi!",
                                              multi=game.translate))
         else:
-            send_async(context.bot, chat.id, text=__("Removing {name} from the game",
+            send_async(context.bot, chat.id, text=__("Kənarlaşdırılır {name} oyundan",
                                              multi=game.translate)
                        .format(name=display_name(user)))
 
@@ -358,17 +357,17 @@ def start_game(update: Update, context: CallbackContext):
             game = gm.chatid_games[chat.id][-1]
         except (KeyError, IndexError):
             send_async(context.bot, chat.id,
-                       text=_("There is no game running in this chat. Create "
-                              "a new one with /new"))
+                       text=_("Heç bir Oyun oynanılmır qrupda indi. Yarat "
+                              "yeni birin /new"))
             return
 
         if game.started:
-            send_async(context.bot, chat.id, text=_("The game has already started"))
+            send_async(context.bot, chat.id, text=_("Oyun artıq başlayıb"))
 
         elif len(game.players) < MIN_PLAYERS:
             send_async(context.bot, chat.id,
-                       text=__("At least {minplayers} players must /join the game "
-                              "before you can start it").format(minplayers=MIN_PLAYERS))
+                       text=__("Ən azından {minplayers} oyunçular qoşulmalıdırlar /join oyuna "
+                              "siz oyunu start etməyinizdən əvvəl").format(minplayers=MIN_PLAYERS))
 
         else:
             # Starting a game
@@ -376,12 +375,10 @@ def start_game(update: Update, context: CallbackContext):
 
             for player in game.players:
                 player.draw_first_hand()
-            choice = [[InlineKeyboardButton(text=_("Make your choice!"), switch_inline_query_current_chat='')]]
+            choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
             first_message = (
-                __("First player: {name}\n"
-                   "Use /close to stop people from joining the game.\n"
-                   "Enable multi-translations with /enable_translations",
-                   multi=game.translate)
+                __("İlk Oyunçu: {name}\n"
+                   "Bunu /close edərək başqalarının oyuna qoşulmağını bağlayın.\n")
                 .format(name=display_name(game.current_player.user)))
 
             def send_first():
@@ -415,7 +412,7 @@ def start_game(update: Update, context: CallbackContext):
             )
 
         send_async(context.bot, update.message.chat_id,
-                   text=_('Please select the group you want to play in.'),
+                   text=_('Zəhmət olmasa oyunu oynamaq istədiyiniz qrupu seçin.'),
                    reply_markup=InlineKeyboardMarkup(groups))
 
     else:
@@ -431,20 +428,20 @@ def close_game(update: Update, context: CallbackContext):
 
     if not games:
         send_async(context.bot, chat.id,
-                   text=_("There is no running game in this chat."))
+                   text=_("Bu Qrupda heç bir Oyun oynanılmır."))
         return
 
     game = games[-1]
 
     if user.id in game.owner:
         game.open = False
-        send_async(context.bot, chat.id, text=_("Closed the lobby. "
-                                        "No more players can join this game."))
+        send_async(context.bot, chat.id, text=_("Oyuna qeydiyyat bağlandı. "
+                                        "Bu oyuna artıq heç kim qoşula bilməz."))
         return
 
     else:
         send_async(context.bot, chat.id,
-                   text=_("Only the game creator ({name}) and admin can do that.")
+                   text=_("Ancaq Oyunu başladan ({name}) bunu edə bilər.")
                    .format(name=game.starter.first_name),
                    reply_to_message_id=update.message.message_id)
         return
@@ -459,19 +456,19 @@ def open_game(update: Update, context: CallbackContext):
 
     if not games:
         send_async(context.bot, chat.id,
-                   text=_("There is no running game in this chat."))
+                   text=_("Bu Qrupda heç bir Oyun oynanılmır"))
         return
 
     game = games[-1]
 
     if user.id in game.owner:
         game.open = True
-        send_async(context.bot, chat.id, text=_("Opened the lobby. "
-                                        "New players may /join the game."))
+        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. "
+                                        "Yeni oyunçular /join yazaraq oyuna qoşua bilərlər."))
         return
     else:
         send_async(context.bot, chat.id,
-                   text=_("Only the game creator ({name}) and admin can do that.")
+                   text=_("Ancaq Oyunu başladan({name}) bunu edə bilər.")
                    .format(name=game.starter.first_name),
                    reply_to_message_id=update.message.message_id)
         return
@@ -544,7 +541,7 @@ def skip_player(update: Update, context: CallbackContext):
     player = gm.player_for_user_in_chat(user, chat)
     if not player:
         send_async(context.bot, chat.id,
-                   text=_("You are not playing in a game in this chat."))
+                   text=_("Siz Oyun oynamırsız bu qrupda ."))
         return
 
     game = player.game
@@ -559,8 +556,8 @@ def skip_player(update: Update, context: CallbackContext):
     if delta < skipped_player.waiting_time and player != skipped_player:
         n = skipped_player.waiting_time - delta
         send_async(context.bot, chat.id,
-                   text=_("Please wait {time} second",
-                          "Please wait {time} seconds",
+                   text=_("Zəhmət olmasa gözləyin {time} saniyə",
+                          "Zəhmət olmasa gözləyin {time} saniyə",
                           n)
                    .format(time=n),
                    reply_to_message_id=update.message.message_id)
@@ -636,7 +633,7 @@ def reply_to_query(update: Update, context: CallbackContext):
             result.id += ':%d' % player.anti_cheat
 
         if players and game and len(players) > 1:
-            switch = _('Current game: {game}').format(game=game.chat.title)
+            switch = _('İndiki Oyun: {game}').format(game=game.chat.title)
 
     answer_async(context.bot, update.inline_query.id, results, cache_time=0,
                  switch_pm_text=switch, switch_pm_parameter='select')
@@ -658,7 +655,7 @@ def process_result(update: Update, context: CallbackContext):
     except (KeyError, AttributeError):
         return
 
-    logger.debug("Selected result: " + result_id)
+    logger.debug("Axtarılan nəticə: " + result_id)
 
     result_id, anti_cheat = result_id.split(':')
     last_anti_cheat = player.anti_cheat
@@ -670,14 +667,14 @@ def process_result(update: Update, context: CallbackContext):
         # First 5 characters are 'mode_', the rest is the gamemode.
         mode = result_id[5:]
         game.set_mode(mode)
-        logger.info("Gamemode changed to {mode}".format(mode = mode))
-        send_async(context.bot, chat.id, text=__("Gamemode changed to {mode}".format(mode = mode)))
+        logger.info("Oyun modu dəyişildi {mode}".format(mode = mode))
+        send_async(context.bot, chat.id, text=__("Oyun modu dəyişildi {mode}".format(mode = mode)))
         return
     elif len(result_id) == 36:  # UUID result
         return
     elif int(anti_cheat) != last_anti_cheat:
         send_async(context.bot, chat.id,
-                   text=__("Cheat attempt by {name}", multi=game.translate)
+                   text=__("Fırıldaq cəhdi edən {name}", multi=game.translate)
                    .format(name=display_name(player.user)))
         return
     elif result_id == 'call_bluff':
@@ -696,9 +693,9 @@ def process_result(update: Update, context: CallbackContext):
 
     if game_is_running(game):
         nextplayer_message = (
-            __("Next player: {name}", multi=game.translate)
+            __("Növbəti oyunçu: {name}", multi=game.translate)
             .format(name=display_name(game.current_player.user)))
-        choice = [[InlineKeyboardButton(text=_("Make your choice!"), switch_inline_query_current_chat='')]]
+        choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
         send_async(context.bot, chat.id,
                         text=nextplayer_message,
                         reply_markup=InlineKeyboardMarkup(choice))
@@ -712,8 +709,8 @@ def reset_waiting_time(bot, player):
     if player.waiting_time < WAITING_TIME:
         player.waiting_time = WAITING_TIME
         send_async(bot, chat.id,
-                   text=__("Waiting time for {name} has been reset to {time} "
-                           "seconds", multi=player.game.translate)
+                   text=__("Gözləmə vaxtı {name} yeniləndi {time} "
+                           "saniyə", multi=player.game.translate)
                    .format(name=display_name(player.user), time=WAITING_TIME))
 
 
@@ -729,9 +726,9 @@ dispatcher.add_handler(CommandHandler('leave', leave_game))
 dispatcher.add_handler(CommandHandler('kick', kick_player))
 dispatcher.add_handler(CommandHandler('open', open_game))
 dispatcher.add_handler(CommandHandler('close', close_game))
-dispatcher.add_handler(CommandHandler('enable_translationss',
+dispatcher.add_handler(CommandHandler('enablelrme_translationss',
                                       enable_translations))
-dispatcher.add_handler(CommandHandler('disable_translationss',
+dispatcher.add_handler(CommandHandler('disableleme_translationss',
                                       disable_translations))
 dispatcher.add_handler(CommandHandler('skip', skip_player))
 dispatcher.add_handler(CommandHandler('notify_me', notify_me))
