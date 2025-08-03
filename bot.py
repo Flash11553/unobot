@@ -357,7 +357,7 @@ def start_game(update: Update, context: CallbackContext):
             game = gm.chatid_games[chat.id][-1]
         except (KeyError, IndexError):
             send_async(context.bot, chat.id,
-                       text=_("😊 Məni Qrupunuza əlavə etdiyiniz üçün təşəkkürlər. Yeni Oyun yaratmaq üçün /new ✅ yazın və qrupda vaxtınızı dostlarınız ilə marağlı keçirin 💎"))
+                       text=_("Məni Qrupunuza əlavə etdiyiniz üçün təşəkkürlər. Yeni Oyun yaratmaq üçün /new yazın və qrupda vaxtınızı dostlarınız ilə marağlı keçirin "))
             return
 
         if game.started:
