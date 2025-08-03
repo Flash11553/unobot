@@ -81,7 +81,7 @@ class Game(object):
 
     def turn(self):
         """Marks the turn as over and change the current player"""
-        self.logger.debug("Növbəti Oyunçu)
+        self.logger.debug("Növbəti Oyunçu")
         self.current_player = self.current_player.next
         self.current_player.drew = False
         self.current_player.turn_started = datetime.now()
