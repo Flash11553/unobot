@@ -104,7 +104,7 @@ def news(update: Update, context: CallbackContext):
 def stats(update: Update, context: CallbackContext):
     user = update.message.from_user
     us = UserSetting.get(id=user.id)
-    if not us or not us.stats:
+    if not us:
         send_async(context.bot, update.message.chat_id,
                    text=_("You did not enable statistics. Use /settings in "
                           "a private chat with the bot to enable them."))
@@ -113,23 +113,23 @@ def stats(update: Update, context: CallbackContext):
 
         n = us.games_played
         stats_text.append(
-            _("{number} game played",
-              "{number} games played",
+            _("{number} oyun oynanılıb",
+              "{number} oyun oynanılıb",
               n).format(number=n)
         )
 
         n = us.first_places
         m = round((us.first_places / us.games_played) * 100) if us.games_played else 0
         stats_text.append(
-            _("{number} first place ({percent}%)",
-              "{number} first places ({percent}%)",
+            _("{number} birinci yer({percent}%)",
+              "{number} birinci yerlər ({percent}%)",
               n).format(number=n, percent=m)
         )
 
         n = us.cards_played
         stats_text.append(
-            _("{number} card played",
-              "{number} cards played",
+            _("{number} kart oynanılıb",
+              "{number} kartlar oynanılıb",
               n).format(number=n)
         )
 
