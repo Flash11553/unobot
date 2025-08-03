@@ -96,7 +96,7 @@ def locale_select(update: Update, context: CallbackContext):
         _.pop()
 
 def register():
-    dispatcher.add_handler(CommandHandler('settings', show_settings))
+    dispatcher.add_handler(CommandHandler('settdkdkings', show_settings))
     dispatcher.add_handler(MessageHandler(Filters.regex('^([' + '📊' +
                                                         '🌍' +
                                                         '❌' + ']) .+$'),
