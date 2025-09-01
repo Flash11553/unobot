@@ -149,13 +149,12 @@ def join_game(update: Update, context: CallbackContext):
     except NoGameInChatError:
         send_async(context.bot, chat.id,
                    text=_("Heç bir Oyun getmir indi. "
-                          "Yeni oyun yarat bu əmr ilə /new"),
+                          "Yeni oyun bu əmr ilə yarat: /new"),
                    reply_to_message_id=update.message.message_id)
 
     except AlreadyJoinedError:
         send_async(context.bot, chat.id,
-                   text=_("Siz artıq oyuna qoşulmusunuz."
-                          "Oyuna bu əmr ilə başla /start"),
+                   text=_("Siz artıq oyuna qoşulmusunuz. Oyunu bu əmr ilə başladın: /start"),
                    reply_to_message_id=update.message.message_id)
 
     except DeckEmptyError:
@@ -179,8 +178,7 @@ def leave_game(update: Update, context: CallbackContext):
     player = gm.player_for_user_in_chat(user, chat)
 
     if player is None:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki "
-                                        "oyunda."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -191,8 +189,7 @@ def leave_game(update: Update, context: CallbackContext):
         gm.leave_game(user, chat)
 
     except NoGameInChatError:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki"
-                                        "oyunda."),
+        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
                    reply_to_message_id=update.message.message_id)
 
     except NotEnoughPlayersError:
@@ -340,7 +337,7 @@ def status_update(update: Update, context: CallbackContext):
             send_async(context.bot, chat.id, text=__("Oyun Bitdi!",
                                              multi=game.translate))
         else:
-            send_async(context.bot, chat.id, text=__("Kənarlaşdırılır {name} oyundan",
+            send_async(context.bot, chat.id, text=__("{name} kənarlaşdırılır oyundan",
                                              multi=game.translate)
                        .format(name=display_name(user)))
 
@@ -365,8 +362,8 @@ def start_game(update: Update, context: CallbackContext):
 
         elif len(game.players) < MIN_PLAYERS:
             send_async(context.bot, chat.id,
-                       text=__("Ən azından {minplayers} oyunçu qoşulmalıdır /join oyuna "
-                              "siin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
+                       text=__("Ən azından {minplayers} oyunçu qoşulmalıdır oyuna: /join ,"
+                              "sizin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
 
         else:
             # Starting a game
