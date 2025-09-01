@@ -115,10 +115,10 @@ class Game(object):
             self.turn()
         elif card.special == c.DRAW_FOUR:
             self.draw_counter += 4
-            self.logger.debug("Çəkilən kartların sayı 4 ə artırıldı")
+            self.logger.debug("Götürülən kartların sayı 4 ə artırıldı")
         elif card.value == c.DRAW_TWO:
             self.draw_counter += 2
-            self.logger.debug("Çəkilən kartların sayı 2 ə artırıldı")
+            self.logger.debug("Götürülən kartların sayı 2 ə artırıldı")
         elif card.value == c.REVERSE:
             # Special rule for two players
             if self.current_player == self.current_player.next.next:
