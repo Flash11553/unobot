@@ -48,7 +48,7 @@ def do_skip(bot, player, job_queue=None):
         n = skipped_player.waiting_time
         send_async(bot, chat.id,
                    text=__("Bu oyunçunu keçmək üçün vaxt"
-                        "azaldı {time} saniyə.\n"
+                        "azaldı. {time} saniyə qaldı.\n"
                         "Növbəti oyunçu: {name}", multi=game.translate)
                    .format(time=n,
                            name=display_name(next_player.user))
