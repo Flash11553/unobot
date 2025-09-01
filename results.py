@@ -51,7 +51,7 @@ def add_other_cards(player, results, game):
         InlineQueryResultArticle(
             "hand",
             title=_("Kart (oyun statistikası üçün basın):",
-                    "Kartlar (oyun statistikası üçün basın):",
+                    "Kart (oyun statistikası üçün basın):",
                     len(player.cards)),
             description=', '.join([repr(card) for card in player.cards]),
             input_message_content=game_info(game)
@@ -62,7 +62,7 @@ def add_other_cards(player, results, game):
 def player_list(game):
     """Generate list of player strings"""
     return [_("{name} ({number} kart)",
-              "{name} ({number} kartlar)",
+              "{name} ({number} kart)",
               len(player.cards))
             .format(name=player.user.first_name, number=len(player.cards))
             for player in game.players]
@@ -75,9 +75,8 @@ def add_no_game(results):
             "nogame",
             title=_("Siz Oynamırsız"),
             input_message_content=
-            InputTextMessageContent(_('İndi oynamır. /new əmrinə basın'
-                                      'oyunu qurmaq üçün və ya /join qoşulmaq üçün'
-                                      'indiki Oyuna bu qrupdaki'))
+            InputTextMessageContent(_('İndi oynanmır. /new əmri ilə oyunu qurun'
+                                      'və ya /join əmr ilə oyuna qoşulun'))
         )
     )
 
@@ -150,8 +149,8 @@ def add_draw(player, results):
         Sticker(
             "draw", sticker_file_id=c.STICKERS['option_draw'],
             input_message_content=
-            InputTextMessageContent(__('Çekir {number} kart',
-                                       'Çekir {number} kartlar', n,
+            InputTextMessageContent(__('{number} kart götürür',
+                                       '{number} kart götürür', n,
                                        multi=player.game.translate)
                                     .format(number=n))
         )
