@@ -459,8 +459,7 @@ def open_game(update: Update, context: CallbackContext):
 
     if user.id in game.owner:
         game.open = True
-        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. "
-                                        "Yeni oyunçular /join yazaraq oyuna qoşua bilərlər."))
+        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. Yeni oyunçular /join yazaraq oyuna qoşua bilərlər."))
         return
     else:
         send_async(context.bot, chat.id,
