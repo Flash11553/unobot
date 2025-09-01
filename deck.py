@@ -45,7 +45,7 @@ class Deck(object):
         """Draws a card from this deck"""
         try:
             card = self.cards.pop()
-            self.logger.debug("Kart Çekilir" + str(card))
+            self.logger.debug("Kart Götürülür" + str(card))
             return card
         except IndexError:
             if len(self.graveyard):
