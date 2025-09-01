@@ -154,14 +154,14 @@ def join_game(update: Update, context: CallbackContext):
 
     except AlreadyJoinedError:
         send_async(context.bot, chat.id,
-                   text=_("Siz artıq oyuna qoşulmusunuz.Oyuna Başla "
-                          "bu əmr ilə /start"),
+                   text=_("Siz artıq oyuna qoşulmusunuz."
+                          "Oyuna bu əmr ilə başla /start"),
                    reply_to_message_id=update.message.message_id)
 
     except DeckEmptyError:
         send_async(context.bot, chat.id,
                    text=_("Əlinizdə kifayət qədər kart qalmayıb"
-                          "yeni oyunçuların qoşuması üçün."),
+                          "yeni oyunçuların qoşulması üçün."),
                    reply_to_message_id=update.message.message_id)
 
     else:
@@ -365,8 +365,8 @@ def start_game(update: Update, context: CallbackContext):
 
         elif len(game.players) < MIN_PLAYERS:
             send_async(context.bot, chat.id,
-                       text=__("Ən azından {minplayers} oyunçular qoşulmalıdırlar /join oyuna "
-                              "siz oyunu start etməyinizdən əvvəl").format(minplayers=MIN_PLAYERS))
+                       text=__("Ən azından {minplayers} oyunçu qoşulmalıdır /join oyuna "
+                              "siin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
 
         else:
             # Starting a game
@@ -377,7 +377,7 @@ def start_game(update: Update, context: CallbackContext):
             choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
             first_message = (
                 __("İlk Oyunçu: {name}\n"
-                   "Bunu /close edərək başqalarının oyuna qoşulmağını bağlayın.\n")
+                   "/close edərək başqalarının oyuna qoşulmağını bağlayın.\n")
                 .format(name=display_name(game.current_player.user)))
 
             def send_first():
@@ -555,8 +555,8 @@ def skip_player(update: Update, context: CallbackContext):
     if delta < skipped_player.waiting_time and player != skipped_player:
         n = skipped_player.waiting_time - delta
         send_async(context.bot, chat.id,
-                   text=_("Zəhmət olmasa gözləyin: {time} saniyə",
-                          "Zəhmət olmasa gözləyin: {time} saniyə",
+                   text=_("Zəhmət olmasa {time} saniyə gözləyin",
+                          "Zəhmət olmasa {time} saniyə gözləyin",
                           n)
                    .format(time=n),
                    reply_to_message_id=update.message.message_id)
@@ -708,7 +708,7 @@ def reset_waiting_time(bot, player):
     if player.waiting_time < WAITING_TIME:
         player.waiting_time = WAITING_TIME
         send_async(bot, chat.id,
-                   text=__("Gözləmə vaxtı {name} yeniləndi {time} "
+                   text=__("{name} gözləmə vaxtı yeniləndi: {time} "
                            "saniyə", multi=player.game.translate)
                    .format(name=display_name(player.user), time=WAITING_TIME))
 
