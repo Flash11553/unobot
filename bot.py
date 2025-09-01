@@ -555,8 +555,8 @@ def skip_player(update: Update, context: CallbackContext):
     if delta < skipped_player.waiting_time and player != skipped_player:
         n = skipped_player.waiting_time - delta
         send_async(context.bot, chat.id,
-                   text=_("Zəhmət olmasa gözləyin {time} saniyə",
-                          "Zəhmət olmasa gözləyin {time} saniyə",
+                   text=_("Zəhmət olmasa gözləyin: {time} saniyə",
+                          "Zəhmət olmasa gözləyin: {time} saniyə",
                           n)
                    .format(time=n),
                    reply_to_message_id=update.message.message_id)
