@@ -121,7 +121,7 @@ def kill_game(update: Update, context: CallbackContext):
 
         except NoGameInChatError:
             send_async(context.bot, chat.id,
-                       text=_("The game is not started yet. "
+                       text=_("Oyun hələ ki başlamayıb."
                               "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün /start"),
                        reply_to_message_id=update.message.message_id)
 
@@ -459,7 +459,7 @@ def open_game(update: Update, context: CallbackContext):
 
     if user.id in game.owner:
         game.open = True
-        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. Yeni oyunçular /join yazaraq oyuna qoşua bilərlər."))
+        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. Yeni oyunçular /join yazaraq oyuna qoşula bilərlər."))
         return
     else:
         send_async(context.bot, chat.id,
