@@ -13,33 +13,33 @@ def help_handler(update: Update, context: CallbackContext):
     help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
       "\n"
       "1️⃣ Bu botu qrupunuza əlavə edin\n"
-"2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun\n"
-"3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın\n"
-"4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
-"\n"
-"👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
-"🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
-"⏱ Əgər bir oyunçu 120 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
-"🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
-"\n"
-"⚙️ Statiskanızı görmək üçün:\n"
-"💎 /stats \n"
-"\n"
-"🔐 Yalnız oyun yaradıcısı üçün əmrlər:\n"
-"🚫 /close — Oyuna girişləri bağla\n"
-"✅ /open — Oyuna girişləri aç\n"
-"🛑 /stop — Oyunu dayandır\n"
-"👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver\n")
+      "2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun\n"
+      "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın\n"
+      "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
+      "\n"
+      "👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
+      "🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
+      "⏱ Əgər bir oyunçu 120 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
+      "🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
+      "\n"
+      "⚙️ Statiskanızı görmək üçün:\n"
+      "💎 /stats \n"
+      "\n"
+      "🔐 Yalnız oyun yaradıcısı üçün əmrlər:\n"
+      "🚫 /close — Oyuna girişləri bağla\n"
+      "✅ /open — Oyuna girişləri aç\n"
+      "🛑 /stop — Oyunu dayandır\n"
+      "👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver\n")
 
-def _send():  
-  update.message.chat.send_message(  
-      help_text,  
-      parse_mode=ParseMode.HTML,  
-      disable_web_page_preview=True,  
-  )  
-  send_promotion(update.effective_chat)  
+    def _send():  
+      update.message.chat.send_message(  
+          help_text,  
+          parse_mode=ParseMode.HTML,  
+          disable_web_page_preview=True,  
+      )  
+      send_promotion(update.effective_chat)  
 
-context.dispatcher.run_async(_send)
+    context.dispatcher.run_async(_send)
 
 @user_locale
 def modes(update: Update, context: CallbackContext):
