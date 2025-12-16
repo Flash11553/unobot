@@ -102,42 +102,38 @@ def news(update: Update, context: CallbackContext):
 # =======================
 @user_locale
 def stats(update: Update, context: CallbackContext):
+    chat_id = update.effective_chat.id
+
+    # TOP 25 oyunçuları qazanclarına görə sıralayıb gətiririk
     top_users = list(
-        users_col.find(
-            {"first_places": {"$gt": 0}}
-        ).sort(
-            "first_places", -1
-        ).limit(25)
+        users_col.find({"first_places": {"$gt": 0}})
+        .sort("first_places", -1)
+        .limit(25)
     )
 
     if not top_users:
         send_async(
             context.bot,
-            update.message.chat_id,
-            text=_("Hələ statistika mövcud deyil.")
+            chat_id,
+            text=_("Hələ statistika mövcud deyil."),
+            disable_web_page_preview=True
         )
         return
 
-    text = ["🏆 TOP 25 — Ən çox qələbə qazanan oyunçular\n"]
-
+    # Mesaj mətnini hazırlayırıq
+    lines = ["🏆 TOP 25 — Ən çox qələbə qazanan oyunçular\n"]
     for i, user in enumerate(top_users, start=1):
-        name = (
-            user.get("first_name")
-            or user.get("username")
-            or f"ID:{user['_id']}"
-        )
-
+        name = user.get("first_name") or user.get("username") or f"ID:{user['_id']}"
         wins = user.get("first_places", 0)
         games = user.get("games_played", 0)
+        lines.append(f"{i}. {name} — 🥇 {wins} qələbə ({games} oyun)")
 
-        text.append(
-            f"{i}. {name} — 🥇 {wins} qələbə ({games} oyun)"
-        )
-
+    # Göndəririk
     send_async(
         context.bot,
-        update.message.chat_id,
-        text="\n".join(text)
+        chat_id,
+        text="\n".join(lines),
+        disable_web_page_preview=True
     )
 
 
