@@ -22,7 +22,7 @@ db = mongo_client["uno_bot"]
 users_col = db["users"]
 
 # Index (performans üçün)
-users_col.create_index("first_places", -1)
+users_col.create_index([("first_places", -1)], background=True)
 
 
 # =======================
