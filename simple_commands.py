@@ -14,7 +14,7 @@ from promotions import send_promotion
 # =======================
 from pymongo import MongoClient
 
-mongo_client = MongoClient("mongodb://localhost:27017/")
+mongo_client = MongoClient("mongodb+srv://turalsuleymanov65:rosetaggerr@rosetagger.jj9vxae.mongodb.net/?retryWrites=true&w=majority&appName=rosetagger")
 db = mongo_client["uno_bot"]
 users_col = db["users"]
 
