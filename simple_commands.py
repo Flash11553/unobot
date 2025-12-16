@@ -9,10 +9,10 @@ from promotions import send_promotion
 
 @user_locale
 def help_handler(update: Update, context: CallbackContext):
-"""Handler for the /help command"""
-help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
-"\n"
-"1️⃣ Bu botu qrupunuza əlavə edin\n"
+    """Handler for the /help command"""
+    help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
+      "\n"
+      "1️⃣ Bu botu qrupunuza əlavə edin\n"
 "2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun\n"
 "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın\n"
 "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
