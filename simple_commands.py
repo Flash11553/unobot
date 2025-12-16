@@ -115,8 +115,8 @@ def stats(update: Update, context: CallbackContext):
                    text='\n'.join(stats_text))
 
 def register():
-dispatcher.add_handler(CommandHandler('help', help_handler))
-dispatcher.add_handler(CommandHandler('yrjrj', source))
-dispatcher.add_handler(CommandHandler('newsdusi', news))
-dispatcher.add_handler(CommandHandler('stats', stats))
-dispatcher.add_handler(CommandHandler('modesdkdk', modes))
+    dispatcher.add_handler(CommandHandler('help', help_handler))
+    dispatcher.add_handler(CommandHandler('yrjrj', source))
+    dispatcher.add_handler(CommandHandler('newsdusi', news))
+    dispatcher.add_handler(CommandHandler('rating', stats))
+    dispatcher.add_handler(CommandHandler('modesdkdk', modes))
