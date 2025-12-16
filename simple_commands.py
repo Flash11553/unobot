@@ -82,37 +82,37 @@ disable_web_page_preview=True)
 @user_locale
 def stats(update: Update, context: CallbackContext):
     user = update.message.from_user
-us = UserSetting.get(id=user.id)
-if not us:
-send_async(context.bot, update.message.chat_id,
-text=_("Sizin Statistikanız hələ mövcud deyil. Əvvəlcə bir oyun oynamaq lazımdır."))
-else:
-stats_text = list()
+    us = UserSetting.get(id=user.id)
+    if not us:
+        send_async(context.bot, update.message.chat_id,
+                   text=_("Sizin Statistikanız hələ mövcud deyil. Əvvəlcə bir oyun oynamaq lazımdır."))
+    else:
+        stats_text = list()
 
-n = us.games_played  
-    stats_text.append(  
-        _("{number} oyun oynanılıb",  
-          "{number} oyun oynanılıb",  
-          n).format(number=n)  
-    )  
+        n = us.games_played  
+        stats_text.append(  
+            _("{number} oyun oynanılıb",  
+              "{number} oyun oynanılıb",  
+              n).format(number=n)  
+        )  
 
-    n = us.first_places  
-    m = round((us.first_places / us.games_played) * 100) if us.games_played else 0  
-    stats_text.append(  
-        _("{number} birinci yer({percent}%)",  
-          "{number} birinci yerlər ({percent}%)",  
-          n).format(number=n, percent=m)  
-    )  
+        n = us.first_places  
+        m = round((us.first_places / us.games_played) * 100) if us.games_played else 0  
+        stats_text.append(  
+            _("{number} birinci yer({percent}%)",  
+              "{number} birinci yerlər ({percent}%)",  
+              n).format(number=n, percent=m)  
+        )  
 
-    n = us.cards_played  
-    stats_text.append(  
-        _("{number} kart oynanılıb",  
-          "{number} kart oynanılıb",  
-          n).format(number=n)  
-    )  
+        n = us.cards_played  
+        stats_text.append(  
+            _("{number} kart oynanılıb",  
+              "{number} kart oynanılıb",  
+              n).format(number=n)  
+        )  
 
-    send_async(context.bot, update.message.chat_id,  
-               text='\n'.join(stats_text))
+        send_async(context.bot, update.message.chat_id,  
+                   text='\n'.join(stats_text))
 
 def register():
 dispatcher.add_handler(CommandHandler('help', help_handler))
