@@ -51,7 +51,7 @@ def modes(update: Update, context: CallbackContext):
       " ✍️ The Text mode uses the conventional UNO deck but instead of stickers it uses the text.\n\n"
       "To change the game mode, the GAME CREATOR has to type the bot nickname and a space, "
       "just like when playing a card, and all gamemode options should appear.")
-   send_async(context.bot, update.message.chat_id, text=modes_explanation,
+    send_async(context.bot, update.message.chat_id, text=modes_explanation,
               parse_mode=ParseMode.HTML, disable_web_page_preview=True) 
 
 @user_locale
