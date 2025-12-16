@@ -12,17 +12,8 @@ from promotions import send_promotion
 # =======================
 # MongoDB
 # =======================
-from pymongo import MongoClient
-
-mongo_client = MongoClient(
-    "mongodb+srv://turalsuleymanov65:rosetaggerr@rosetagger.jj9vxae.mongodb.net/?retryWrites=true&w=majority",
-    serverSelectionTimeoutMS=5000  # Server seçimi üçün timeout əlavə et
-)
-db = mongo_client["uno_bot"]
-users_col = db["users"]
-
-# Index (performans üçün)
-users_col.create_index([("first_places", -1)], background=True)
+from pony.orm import db_session, desc
+from models import UserSetting
 
 
 # =======================
@@ -104,39 +95,36 @@ def news(update: Update, context: CallbackContext):
 # STATS → TOP 25
 # =======================
 @user_locale
+@db_session
 def stats(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
-    # TOP 25 oyunçuları qazanclarına görə sıralayıb gətiririk
-    top_users = list(
-        users_col.find({"first_places": {"$gt": 0}})
-        .sort("first_places", -1)
-        .limit(25)
+    users = (
+        UserSetting
+        .select(lambda u: u.first_places > 0 and u.stats == True)
+        .order_by(lambda u: desc(u.first_places))
+        [:25]
     )
 
-    if not top_users:
+    if not users:
         send_async(
             context.bot,
             chat_id,
-            text=_("Hələ statistika mövcud deyil."),
-            disable_web_page_preview=True
+            text=_("Hələ statistika mövcud deyil.")
         )
         return
 
-    # Mesaj mətnini hazırlayırıq
     lines = ["🏆 TOP 25 — Ən çox qələbə qazanan oyunçular\n"]
-    for i, user in enumerate(top_users, start=1):
-        name = user.get("first_name") or user.get("username") or f"ID:{user['_id']}"
-        wins = user.get("first_places", 0)
-        games = user.get("games_played", 0)
-        lines.append(f"{i}. {name} — 🥇 {wins} qələbə ({games} oyun)")
 
-    # Göndəririk
+    for i, user in enumerate(users, start=1):
+        lines.append(
+            f"{i}. ID:{user.id} — 🥇 {user.first_places} qələbə ({user.games_played} oyun)"
+        )
+
     send_async(
         context.bot,
         chat_id,
-        text="\n".join(lines),
-        disable_web_page_preview=True
+        text="\n".join(lines)
     )
 
 
