@@ -14,7 +14,10 @@ from promotions import send_promotion
 # =======================
 from pymongo import MongoClient
 
-mongo_client = MongoClient("mongodb+srv://turalsuleymanov65:rosetaggerr@rosetagger.jj9vxae.mongodb.net/?retryWrites=true&w=majority&appName=rosetagger")
+mongo_client = MongoClient(
+    "mongodb+srv://turalsuleymanov65:rosetaggerr@rosetagger.jj9vxae.mongodb.net/?retryWrites=true&w=majority",
+    serverSelectionTimeoutMS=5000  # Server seçimi üçün timeout əlavə et
+)
 db = mongo_client["uno_bot"]
 users_col = db["users"]
 
