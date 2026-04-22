@@ -20,6 +20,9 @@
 
 import os
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     with open("config.json", "r") as f:
