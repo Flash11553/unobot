@@ -1,53 +1,68 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-# Telegram bot to play UNO in group chats
-# Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-
 import os
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
 
-try:
-    with open("config.json", "r") as f:
-        config = json.load(f)
-except FileNotFoundError:
-    config = {}
+# Bot token - .env faylından oxunur (serverdə: TOKEN=... yazılır)
+TOKEN = os.getenv("TOKEN")
+if not TOKEN:
+    raise ValueError("TOKEN .env faylında və ya mühit dəyişənlərində tapılmadı!")
 
-TOKEN = os.getenv("TOKEN", config.get("token"))
-WORKERS = int(os.getenv("WORKERS", config.get("workers", 32)))
-ADMIN_LIST = os.getenv("ADMIN_LIST", config.get("admin_list", None))
+# MongoDB URL - .env faylından oxunur (serverdə: MONGO=... yazılır)
+MONGO_URL = os.getenv("MONGO", "mongodb://localhost:27017")
 
-if isinstance(ADMIN_LIST, str):
-    ADMIN_LIST = set(int(x) for x in ADMIN_LIST.split())
+# Sudo istifadəçilər (broadcast üçün) - vergüllə ayrılmış ID-lər
+SUDO_USERS = os.getenv("SUDO_USERS", "").split(",")
 
-OPEN_LOBBY = os.getenv("OPEN_LOBBY", config.get("open_lobby", True))
-ENABLE_TRANSLATIONS = os.getenv("ENABLE_TRANSLATIONS", config.get("enable_translations", False))
+# Bot parametrləri
+WORKERS = int(os.getenv("WORKERS", 4))
+ADMIN_LIST = []
+OPEN_LOBBY = True
+DEFAULT_GAMEMODE = "classic"
+ENABLE_TRANSLATIONS = False
+WAITING_TIME = 120
 
-if isinstance(OPEN_LOBBY, str):
-    OPEN_LOBBY = OPEN_LOBBY.lower() in ("yes", "true", "t", "1")
+# Oyun limitləri
+MIN_PLAYERS = 2
+MAX_PLAYERS = 10
 
-if isinstance(ENABLE_TRANSLATIONS, str):
-    ENABLE_TRANSLATIONS = ENABLE_TRANSLATIONS.lower() in ("yes", "true", "t", "1")
+# Səviyyə sistemi: (tələb olunan ümumi xal, ad, emoji)
+RANKS = [
+    (0,      "Yeni Başlayan",  "🌱"),
+    (50,     "Çavuş",         "⚔️"),
+    (150,    "Cəngavər",      "🛡️"),
+    (350,    "Usta",          "🎯"),
+    (700,    "Qəhrəman",      "🦸"),
+    (1200,   "Böyük Usta",    "🌟"),
+    (2000,   "Əfsanə",        "👑"),
+    (3000,   "Tanrı",         "🔱"),
+    (5000,   "Ölümsüz",       "💎"),
+    (8000,   "UNO Allahı",    "🏆"),
+]
 
-DEFAULT_GAMEMODE = os.getenv("DEFAULT_GAMEMODE", config.get("default_gamemode", "fast"))
-WAITING_TIME = int(os.getenv("WAITING_TIME", config.get("waiting_time", 120)))
-TIME_REMOVAL_AFTER_SKIP = int(os.getenv("TIME_REMOVAL_AFTER_SKIP", config.get("time_removal_after_skip", 20)))
-MIN_FAST_TURN_TIME = int(os.getenv("MIN_FAST_TURN_TIME", config.get("min_fast_turn_time", 15)))
-MIN_PLAYERS = int(os.getenv("MIN_PLAYERS", config.get("min_players", 2)))
+# Xal sistemi: oyundakı mövqeyə görə qazanılan xal
+PLACE_POINTS = {
+    1: 30,   # 1-ci yer
+    2: 15,   # 2-ci yer
+    3: 8,    # 3-cü yer
+    4: 4,    # 4-cü yer
+    5: 2,    # 5-ci yer
+    6: 1,    # 6-cı yer
+}
+# 7+ yer üçün 0 xal
+
+def get_rank(total_points):
+    """Ümumi xala görə səviyyə nömrəsi, adı və emojini qaytarır"""
+    level = 1
+    rank_name = RANKS[0][1]
+    rank_emoji = RANKS[0][2]
+    for i, (req_points, name, emoji) in enumerate(RANKS):
+        if total_points >= req_points:
+            level = i + 1
+            rank_name = name
+            rank_emoji = emoji
+        else:
+            break
+    return level, rank_name, rank_emoji

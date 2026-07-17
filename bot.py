@@ -1,736 +1,1065 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-# Telegram bot to play UNO in group chats
-# Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+"""
+UNO Bot — Əsas Handler Faylı
+Ehtiva edir:
+  • /new, /uno  — Domino stilli qeydiyyat menyusu (inline düymələrlə)
+  • /join       — Mövcud lobbiyə qoşulma
+  • /start      — Oyunu başlatma (≥2 oyunçu)
+  • /leave      — Oyundan çıxma
+  • /kick       — Oyunçunu çıxarma (yaradıcı/admin)
+  • /close /open — Lobbini bağla/aç
+  • /stop       — Oyunu dayandır
+  • /skip       — Növbəni keç (vaxt aşımı)
+  • /notify_me  — Yeni oyun bildirişi
+  • /broadcast  — Bütün qrup+istifadəçilərə mesaj (sudo)
+  • /profile    — Oyunçu statistikası
+  • /rating     — Top 25 siyahısı
+  • Inline kart oynama məntiqi
+  • Oyun sonu: tam sıralama (1→N), xal+səviyyə sistemi, MongoDB saxlama
+"""
 
 import logging
+import time
 from datetime import datetime
 
-from telegram import ParseMode, InlineKeyboardMarkup, \
-    InlineKeyboardButton, Update
-from telegram.ext import InlineQueryHandler, ChosenInlineResultHandler, \
-    CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
-from telegram.ext.dispatcher import run_async
+from telegram import (
+    Update, ParseMode, InlineKeyboardMarkup, InlineKeyboardButton,
+    InlineQueryResultArticle, InputTextMessageContent,
+    InlineQueryResultCachedSticker as Sticker,
+)
+from telegram.ext import (
+    Updater, CommandHandler, InlineQueryHandler, ChosenInlineResultHandler,
+    CallbackQueryHandler, MessageHandler, Filters, CallbackContext,
+)
+from telegram.error import TelegramError, Unauthorized, BadRequest
+from pony.orm import db_session
 
 import card as c
-import settings
-import simple_commands
-from actions import do_skip, do_play_card, do_draw, do_call_bluff, start_player_countdown
-from config import WAITING_TIME, DEFAULT_GAMEMODE, MIN_PLAYERS
-from errors import (NoGameInChatError, LobbyClosedError, AlreadyJoinedError,
-                    NotEnoughPlayersError, DeckEmptyError)
-from internationalization import _, __, user_locale, game_locales
-from results import (add_call_bluff, add_choose_color, add_draw, add_gameinfo,
-                     add_no_game, add_not_started, add_other_cards, add_pass,
-                     add_card, add_mode_classic, add_mode_fast, add_mode_wild, add_mode_text)
+from config import (
+    TOKEN, WORKERS, MIN_PLAYERS, MAX_PLAYERS,
+    SUDO_USERS, get_rank, PLACE_POINTS,
+)
+from mongo_db import (
+    add_served_chat, add_served_user, get_served_chats, get_served_users,
+    log_broadcast_error, record_game_result, get_profile, get_top_ratings,
+)
 from shared_vars import gm, updater, dispatcher
-from simple_commands import help_handler
-from start_bot import start_bot
-from utils import display_name
-from utils import send_async, answer_async, error, TIMEOUT, user_is_creator_or_admin, user_is_creator, game_is_running
-
+from game_manager import GameManager
+from errors import (
+    AlreadyJoinedError, LobbyClosedError, NoGameInChatError,
+    NotEnoughPlayersError,
+)
+from utils import (
+    display_name, display_color, display_color_group,
+    user_is_creator_or_admin, user_is_creator,
+)
+from results import (
+    add_card, add_draw, add_gameinfo, add_other_cards, add_pass,
+    add_call_bluff, add_choose_color, add_no_game, add_not_started,
+    add_mode_classic, add_mode_fast, add_mode_wild, add_mode_text,
+)
+from internationalization import _, __, user_locale, game_locales
+from user_setting import UserSetting
+from promotions import send_promotion
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-logging.getLogger('apscheduler').setLevel(logging.WARNING)
 
-@user_locale
-def notify_me(update: Update, context: CallbackContext):
-    """Handler for /notify_me command, pm people for next game"""
-    chat_id = update.message.chat_id
-    if update.message.chat.type == 'private':
-        send_async(bot,
-                   chat_id,
-                   text=_("Yeni oyun başladıqda xəbərdar olmaq üçün bu əmri bir qrupda göndərin."))
-    else:
-        try:
-            gm.remind_dict[chat_id].add(update.message.from_user.id)
-        except KeyError:
-            gm.remind_dict[chat_id] = {update.message.from_user.id}
+# ─── Qeydiyyat menyusu üçün gözləyən bildiriş istifadəçiləri ────────────────
+remind_dict = {}      # chat_id → set of user_ids
 
+
+# ════════════════════════════════════════════════════════════════════════════════
+# KÖMƏKÇİ FUNKSİYALAR
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _rank_tag(user_id: int) -> str:
+    """Oyunçunun qısa səviyyə+ad etiketini qaytarır, məs. [⭐6 Usta]"""
+    prof = get_profile(user_id)
+    if not prof:
+        return "[🌱1 Yeni Başlayan]"
+    level, rank_name, rank_emoji = get_rank(prof.get("total_points", 0))
+    return f"[{rank_emoji}{level} {rank_name}]"
+
+
+def _lobby_text(game) -> str:
+    """Qeydiyyat mesajının mətnini qaytarır."""
+    player_lines = []
+    for i, player in enumerate(game.players, 1):
+        tag = _rank_tag(player.user.id)
+        name = display_name(player.user)
+        player_lines.append(f"  {i}. {name} {tag}")
+
+    count = len(game.players)
+    players_str = "\n".join(player_lines) if player_lines else "  _(hələ kimsə qoşulmayıb)_"
+
+    status = ""
+    if not game.open:
+        status = "\n🔒 *Qeydiyyat bağlıdır*"
+
+    return (
+        f"🃏 *UNO Oyununa Qeydiyyat Başladı!*\n\n"
+        f"*Qoşulanlar ({count}/{MAX_PLAYERS} nəfər):*\n"
+        f"{players_str}\n\n"
+        f"_(Oyunun başlanması üçün ən az {MIN_PLAYERS} nəfər lazımdır)_"
+        f"{status}"
+    )
+
+
+def _lobby_keyboard(game) -> InlineKeyboardMarkup:
+    """Qeydiyyat menyusunun düymələrini qaytarır."""
+    buttons = [[InlineKeyboardButton("🙋 Oyuna Qoşul", callback_data="uno_join")]]
+    if len(game.players) >= MIN_PLAYERS:
+        buttons[0].append(InlineKeyboardButton("▶️ Oyunu Başlat", callback_data="uno_start"))
+    return InlineKeyboardMarkup(buttons)
+
+
+def _update_lobby_message(context: CallbackContext, chat_id: int, message_id: int, game):
+    """Qeydiyyat mesajını yeniləyir."""
+    try:
+        context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=_lobby_text(game),
+            reply_markup=_lobby_keyboard(game),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception:
+        pass
+
+
+def _announce_results(context: CallbackContext, chat_id: int, finish_order: list):
+    """
+    Oyun bitdikdən sonra tam sıralama mesajını göndərir.
+    finish_order: [(place, user, cards_left), ...]  — bitirmə sırasına görə
+    """
+    PLACE_EMOJIS = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = ["🎉 *OYUN BAŞA ÇATDI!* 🎉\n"]
+
+    for place, user, cards_left in finish_order:
+        emoji = PLACE_EMOJIS.get(place, f"{place}.")
+        tag = _rank_tag(user.id)
+        name = display_name(user)
+        pts = PLACE_POINTS.get(place, 0)
+        if cards_left == 0:
+            detail = f"✅ Bitirdi (+{pts} xal)"
+        else:
+            detail = f"{cards_left} kart qaldı (+{pts} xal)"
+        lines.append(f"{emoji} *{name}* {tag}\n   _{detail}_")
+
+    context.bot.send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ACTIVITY MİDDLEWARE — hər mesajda qrup/istifadəçini MongoDB-yə yazır
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _activity_register(update: Update, context: CallbackContext):
+    """Her gelen mesajda qrup ve istifadecini MongoDB-ye yazar (broadcast ucun)."""
+    try:
+        if update.effective_chat and update.effective_user:
+            if update.effective_chat.type in ("group", "supergroup"):
+                add_served_chat(update.effective_chat.id)
+            add_served_user(update.effective_user.id)
+    except Exception:
+        pass
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /new  /uno — YENİ OYUN + QEYDIYYAT MENYUSU
+# ════════════════════════════════════════════════════════════════════════════════
 
 @user_locale
 def new_game(update: Update, context: CallbackContext):
-    """Handler for the /new command"""
-    chat_id = update.message.chat_id
+    """Yeni oyun yaradır və qeydiyyat menyusunu göstərir."""
+    chat = update.effective_chat
+    user = update.effective_user
 
-    if update.message.chat.type == 'private':
-        help_handler(update, context)
-
-    else:
-
-        if update.message.chat_id in gm.remind_dict:
-            for user in gm.remind_dict[update.message.chat_id]:
-                send_async(context.bot,
-                           user,
-                           text=_("Yeni oyun başlayır {title}").format(
-                                title=update.message.chat.title))
-
-            del gm.remind_dict[update.message.chat_id]
-
-        game = gm.new_game(update.message.chat)
-        game.starter = update.message.from_user
-        game.owner = set()
-        game.owner.add(update.message.from_user.id)
-        game.mode = DEFAULT_GAMEMODE
-        send_async(context.bot, chat_id,
-                   text=_("Yeni Oyun başlayır! Oyuna qoşulmaq üçün /join "
-                          "və oyuna start etmək üçün /start"))
-
-
-@user_locale
-def kill_game(update: Update, context: CallbackContext):
-    """Handler for the /kill command"""
-    chat = update.message.chat
-    user = update.message.from_user
-    games = gm.chatid_games.get(chat.id)
-
-    if update.message.chat.type == 'private':
-        help_handler(update, context)
+    if chat.type == "private":
+        update.message.reply_text("Bu əmr yalnız qruplarda işləyir. 👥")
         return
 
-    if not games:
-            send_async(context.bot, chat.id,
-                       text=_("Bu Qrupda heç bir oyun oynanılmır."))
-            return
+    # Broadcast üçün qrubu yaddaşa yaz
+    add_served_chat(chat.id)
+    add_served_user(user.id)
 
-    game = games[-1]
+    # Köhnə oyunları təmizlə, yeni oyun yarat
+    game = gm.new_game(chat)
+    game.starter = user
+    game.owner = [user.id]
 
-    if user_is_creator_or_admin(user, game, context.bot, chat):
+    # Yaradıcını avtomatik qoşmaq üçün join et
+    try:
+        gm.join_game(user, chat)
+    except AlreadyJoinedError:
+        pass
 
-        try:
-            gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
+    msg = update.message.reply_text(
+        _lobby_text(game),
+        reply_markup=_lobby_keyboard(game),
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
-        except NoGameInChatError:
-            send_async(context.bot, chat.id,
-                       text=_("Oyun hələ ki başlamayıb."
-                              "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün /start"),
-                       reply_to_message_id=update.message.message_id)
+    # Mesaj ID-sini saxlayırıq ki, yeniləyə bilək
+    context.chat_data["lobby_msg_id"] = msg.message_id
 
-    else:
-        send_async(context.bot, chat.id,
-                  text=_("Ancaq Oyunu başladan ({name}) bu əmri icra edə bilər")
-                  .format(name=game.starter.first_name),
-                  reply_to_message_id=update.message.message_id)
+    # Bildiriş göndər
+    _send_join_notifications(context, chat.id, user)
+
+
+def _send_join_notifications(context: CallbackContext, chat_id: int, starter):
+    """Yeni oyun başladıqda /notify_me istifadəçilərinə bildiriş göndərir."""
+    for uid in remind_dict.get(chat_id, set()):
+        if uid != starter.id:
+            try:
+                context.bot.send_message(
+                    uid,
+                    f"🔔 {display_name(starter)} yeni UNO oyunu başlatdı!\n"
+                    f"Qoşulmaq üçün qrupa gedin.",
+                )
+            except Exception:
+                pass
+    remind_dict.pop(chat_id, None)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /join — MÖVCUD LOBBIYƏ QOŞULMA
+# ════════════════════════════════════════════════════════════════════════════════
 
 @user_locale
 def join_game(update: Update, context: CallbackContext):
-    """Handler for the /join command"""
-    chat = update.message.chat
+    chat = update.effective_chat
+    user = update.effective_user
 
-    if update.message.chat.type == 'private':
-        help_handler(update, context)
+    if chat.type == "private":
+        update.message.reply_text("Bu əmr yalnız qruplarda işləyir. 👥")
         return
 
-    try:
-        gm.join_game(update.message.from_user, chat)
+    add_served_user(user.id)
 
+    try:
+        gm.join_game(user, chat)
     except LobbyClosedError:
-            send_async(context.bot, chat.id, text=_("Oyuna qeydiyyat bağlanıb"))
-
-    except NoGameInChatError:
-        send_async(context.bot, chat.id,
-                   text=_("Heç bir Oyun getmir indi. "
-                          "Yeni oyun bu əmr ilə yarat: /new"),
-                   reply_to_message_id=update.message.message_id)
-
+        update.message.reply_text("🔒 Qeydiyyat bağlıdır.")
+        return
     except AlreadyJoinedError:
-        send_async(context.bot, chat.id,
-                   text=_("Siz artıq oyuna qoşulmusunuz. Oyunu bu əmr ilə başladın: /start"),
-                   reply_to_message_id=update.message.message_id)
-
-    except DeckEmptyError:
-        send_async(context.bot, chat.id,
-                   text=_("Əlinizdə kifayət qədər kart qalmayıb"
-                          "yeni oyunçuların qoşulması üçün."),
-                   reply_to_message_id=update.message.message_id)
-
-    else:
-        send_async(context.bot, chat.id,
-                   text=_("Oyuna Qoşuldu"),
-                   reply_to_message_id=update.message.message_id)
-
-
-@user_locale
-def leave_game(update: Update, context: CallbackContext):
-    """Handler for the /leave command"""
-    chat = update.message.chat
-    user = update.message.from_user
-
-    player = gm.player_for_user_in_chat(user, chat)
-
-    if player is None:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
-                   reply_to_message_id=update.message.message_id)
+        update.message.reply_text("Siz artıq oyundasınız! ✅")
         return
-
-    game = player.game
-    user = update.message.from_user
-
-    try:
-        gm.leave_game(user, chat)
-
     except NoGameInChatError:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
-                   reply_to_message_id=update.message.message_id)
-
-    except NotEnoughPlayersError:
-        gm.end_game(chat, user)
-        send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
-
-    else:
-        if game.started:
-            send_async(context.bot, chat.id,
-                       text=__("Tamam. Növbəti oyunçu: {name}",
-                               multi=game.translate).format(
-                           name=display_name(game.current_player.user)),
-                       reply_to_message_id=update.message.message_id)
-        else:
-            send_async(context.bot, chat.id,
-                       text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl .",
-                               multi=game.translate).format(
-                           name=display_name(user)),
-                       reply_to_message_id=update.message.message_id)
-
-
-@user_locale
-def kick_player(update: Update, context: CallbackContext):
-    """Handler for the /kick command"""
-
-    if update.message.chat.type == 'private':
-        help_handler(update, context)
+        update.message.reply_text("Bu qrupda aktiv oyun yoxdur. /new ilə oyun başladın.")
         return
 
-    chat = update.message.chat
-    user = update.message.from_user
+    game = gm.chatid_games[chat.id][-1]
 
-    try:
-        game = gm.chatid_games[chat.id][-1]
-
-    except (KeyError, IndexError):
-            send_async(context.bot, chat.id,
-                   text=_("Hal-hazırda heç bir oyun davam etmir."
-                          "Yeni oyun yaradın /new ilə"),
-                   reply_to_message_id=update.message.message_id)
-            return
-
-    if not game.started:
-        send_async(context.bot, chat.id,
-                   text=_("Oyun hələki başlamayıb. "
-                          "Oyuna qoşulmaq üçün /join və oyunu başladmaq üçün /start"),
-                   reply_to_message_id=update.message.message_id)
+    if len(game.players) > MAX_PLAYERS:
+        gm.leave_game(user, chat)
+        update.message.reply_text(f"⛔ Oyunçu sayı maksimuma ({MAX_PLAYERS}) çatıb.")
         return
 
-    if user_is_creator_or_admin(user, game, context.bot, chat):
+    update.message.reply_text(f"✅ {display_name(user)} oyuna qoşuldu!")
 
-        if update.message.reply_to_message:
-            kicked = update.message.reply_to_message.from_user
-
-            try:
-                gm.leave_game(kicked, chat)
-
-            except NoGameInChatError:
-                send_async(context.bot, chat.id, text=_("Oyunçu {name} tapılmadı indiki oyunda.".format(name=display_name(kicked))),
-                                reply_to_message_id=update.message.message_id)
-                return
-
-            except NotEnoughPlayersError:
-                gm.end_game(chat, user)
-                send_async(context.bot, chat.id,
-                                text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
-                send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
-                return
-
-            send_async(context.bot, chat.id,
-                            text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
-
-        else:
-            send_async(context.bot, chat.id,
-                text=_("Oyundan atmaq istədiyiniz şəxsə cavab verin və /kick yazın."),
-                reply_to_message_id=update.message.message_id)
-            return
-
-        send_async(context.bot, chat.id,
-                   text=__("Tamam. Növbəti oyunçu: {name}",
-                           multi=game.translate).format(
-                       name=display_name(game.current_player.user)),
-                   reply_to_message_id=update.message.message_id)
-
-    else:
-        send_async(context.bot, chat.id,
-                  text=_("Ancaq Oyunu başladan ({name}) bu əmri icra edə bilər.")
-                  .format(name=game.starter.first_name),
-                  reply_to_message_id=update.message.message_id)
+    lobby_msg_id = context.chat_data.get("lobby_msg_id")
+    if lobby_msg_id:
+        _update_lobby_message(context, chat.id, lobby_msg_id, game)
 
 
-def select_game(update: Update, context: CallbackContext):
-    """Handler for callback queries to select the current game"""
+# ════════════════════════════════════════════════════════════════════════════════
+# CALLBACK QUERY — "Oyuna Qoşul" / "Oyunu Başlat" düymələri
+# ════════════════════════════════════════════════════════════════════════════════
 
-    chat_id = int(update.callback_query.data)
-    user_id = update.callback_query.from_user.id
-    players = gm.userid_players[user_id]
-    for player in players:
-        if player.game.chat.id == chat_id:
-            gm.userid_current[user_id] = player
-            break
-    else:
-        send_async(bot,
-                   update.callback_query.message.chat_id,
-                   text=_("Oyun Tapılmadı."))
-        return
+def lobby_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    chat = query.message.chat
+    user = query.from_user
 
-    def selected():
-        back = [[InlineKeyboardButton(text=_("Sonuncu qrupa qayıt"),
-                                      switch_inline_query='')]]
-        context.bot.answerCallbackQuery(update.callback_query.id,
-                                text=_("Zəhmət olmasa siz seçdiyiniz qrupa çevirin!"),
-                                show_alert=False,
-                                timeout=TIMEOUT)
+    add_served_user(user.id)
 
-        context.bot.editMessageText(chat_id=update.callback_query.message.chat_id,
-                            message_id=update.callback_query.message.message_id,
-                            text=_("Seçilmiş qrup: {group}\n"
-                                   "<b>Əmin olun ki düzgün qrupa çevirdiz"
-                                   "qrup!</b>").format(
-                                group=gm.userid_current[user_id].game.chat.title),
-                            reply_markup=InlineKeyboardMarkup(back),
-                            parse_mode=ParseMode.HTML,
-                            timeout=TIMEOUT)
-
-    dispatcher.run_async(selected)
-
-
-@game_locales
-def status_update(update: Update, context: CallbackContext):
-    """Remove player from game if user leaves the group"""
-    chat = update.message.chat
-
-    if update.message.left_chat_member:
-        user = update.message.left_chat_member
-
-        try:
-            gm.leave_game(user, chat)
-            game = gm.player_for_user_in_chat(user, chat).game
-
-        except NoGameInChatError:
-            pass
-        except NotEnoughPlayersError:
-            gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Oyun Bitdi!",
-                                             multi=game.translate))
-        else:
-            send_async(context.bot, chat.id, text=__("{name} kənarlaşdırılır oyundan",
-                                             multi=game.translate)
-                       .format(name=display_name(user)))
-
-
-@game_locales
-@user_locale
-def start_game(update: Update, context: CallbackContext):
-    """Handler for the /start command"""
-
-    if update.message.chat.type != 'private':
-        chat = update.message.chat
-
-        try:
-            game = gm.chatid_games[chat.id][-1]
-        except (KeyError, IndexError):
-            send_async(context.bot, chat.id,
-                       text=_("Məni Qrupunuza əlavə etdiyiniz üçün təşəkkürlər. Yeni Oyun yaratmaq üçün /new yazın və qrupda vaxtınızı dostlarınız ilə marağlı keçirin "))
-            return
-
-        if game.started:
-            send_async(context.bot, chat.id, text=_("Oyun artıq başlayıb"))
-
-        elif len(game.players) < MIN_PLAYERS:
-            send_async(context.bot, chat.id,
-                       text=__("Ən azından {minplayers} oyunçu qoşulmalıdır oyuna: /join ,"
-                              "sizin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
-
-        else:
-            # Starting a game
-            game.start()
-
-            for player in game.players:
-                player.draw_first_hand()
-            choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
-            first_message = (
-                __("İlk Oyunçu: {name}\n"
-                   "/close edərək başqalarının oyuna qoşulmağını bağlayın.\n")
-                .format(name=display_name(game.current_player.user)))
-
-            def send_first():
-                """Send the first card and player"""
-
-                context.bot.sendSticker(chat.id,
-                                sticker=c.STICKERS[str(game.last_card)],
-                                timeout=TIMEOUT)
-
-                context.bot.sendMessage(chat.id,
-                                text=first_message,
-                                reply_markup=InlineKeyboardMarkup(choice),
-                                timeout=TIMEOUT)
-
-            dispatcher.run_async(send_first)
-            start_player_countdown(context.bot, game, context.job_queue)
-
-    elif len(context.args) and context.args[0] == 'select':
-        players = gm.userid_players[update.message.from_user.id]
-
-        groups = list()
-        for player in players:
-            title = player.game.chat.title
-
-            if player == gm.userid_current[update.message.from_user.id]:
-                title = '- %s -' % player.game.chat.title
-
-            groups.append(
-                [InlineKeyboardButton(text=title,
-                                      callback_data=str(player.game.chat.id))]
-            )
-
-        send_async(context.bot, update.message.chat_id,
-                   text=_('Zəhmət olmasa oyunu oynamaq istədiyiniz qrupu seçin.'),
-                   reply_markup=InlineKeyboardMarkup(groups))
-
-    else:
-        help_handler(update, context)
-
-
-@user_locale
-def close_game(update: Update, context: CallbackContext):
-    """Handler for the /close command"""
-    chat = update.message.chat
-    user = update.message.from_user
-    games = gm.chatid_games.get(chat.id)
-
+    games = gm.chatid_games.get(chat.id, [])
     if not games:
-        send_async(context.bot, chat.id,
-                   text=_("Bu Qrupda heç bir Oyun oynanılmır."))
+        query.answer("Aktiv oyun tapılmadı. /new ilə yenisini başladın.", show_alert=True)
         return
 
     game = games[-1]
 
-    if user.id in game.owner:
-        game.open = False
-        send_async(context.bot, chat.id, text=_("Oyuna qeydiyyat bağlandı. "
-                                        "Bu oyuna artıq heç kim qoşula bilməz."))
+    if query.data == "uno_join":
+        if game.started:
+            query.answer("Oyun artıq başlayıb! Növbəti oyunu gözləyin.", show_alert=True)
+            return
+        if len(game.players) >= MAX_PLAYERS:
+            query.answer(f"Oyunçu sayı maksimuma ({MAX_PLAYERS}) çatıb.", show_alert=True)
+            return
+        if not game.open:
+            query.answer("🔒 Qeydiyyat bağlıdır.", show_alert=True)
+            return
+
+        try:
+            gm.join_game(user, chat)
+        except AlreadyJoinedError:
+            query.answer("Siz artıq oyundasınız! ✅")
+            return
+        except Exception as e:
+            query.answer(str(e), show_alert=True)
+            return
+
+        query.answer(f"✅ {user.first_name} qoşuldu!")
+        _update_lobby_message(context, chat.id, query.message.message_id, game)
+
+    elif query.data == "uno_start":
+        if user.id not in game.owner and not _is_admin(context.bot, user, chat):
+            query.answer("Yalnız oyun yaradıcısı başlada bilər!", show_alert=True)
+            return
+        if len(game.players) < MIN_PLAYERS:
+            query.answer(f"Ən az {MIN_PLAYERS} oyunçu lazımdır!", show_alert=True)
+            return
+        if game.started:
+            query.answer("Oyun artıq başlayıb!")
+            return
+
+        query.answer("▶️ Oyun başladı!")
+        _do_start_game(context, chat, game, query.message.message_id)
+
+
+def _is_admin(bot, user, chat):
+    try:
+        member = bot.get_chat_member(chat.id, user.id)
+        return member.status in ("administrator", "creator")
+    except Exception:
+        return False
+
+
+def _do_start_game(context: CallbackContext, chat, game, lobby_msg_id=None):
+    """Oyunu başladır, lobbiyi silir, birinci kartı açır."""
+    game.start()
+
+    # Lobbiyi sil
+    if lobby_msg_id:
+        try:
+            context.bot.delete_message(chat.id, lobby_msg_id)
+        except Exception:
+            pass
+
+    # finish_order saxlama üçün
+    game.finish_order = []   # [(place, user, cards_left)]
+
+    context.bot.send_message(
+        chat.id,
+        f"🃏 *Oyun başladı!* İlk kart: *{repr(game.last_card)}*\n\n"
+        f"İndi *{display_name(game.current_player.user)}*-in növbəsidir.\n"
+        f"Kart oynamaq üçün ` @botun_adı ` yazın (inline rejim).",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /start — Oyunu başlat (əmrlə)
+# ════════════════════════════════════════════════════════════════════════════════
+
+@user_locale
+def start_game(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if chat.type == "private":
+        # Şəxsi söhbətdə /start — xoş gəlmisiniz mesajı
+        update.message.reply_text(
+            "👋 Salam! Mən UNO botuyam.\n\n"
+            "Məni qrupa əlavə edin və /new ilə oyun başladın! 🃏",
+        )
         return
 
-    else:
-        send_async(context.bot, chat.id,
-                   text=_("Ancaq Oyunu başladan ({name}) bunu edə bilər.")
-                   .format(name=game.starter.first_name),
-                   reply_to_message_id=update.message.message_id)
+    games = gm.chatid_games.get(chat.id, [])
+    if not games:
+        update.message.reply_text("Aktiv oyun yoxdur. /new ilə yeni oyun başladın.")
         return
+
+    game = games[-1]
+
+    if game.started:
+        update.message.reply_text("Oyun artıq başlayıb! 🃏")
+        return
+
+    if len(game.players) < MIN_PLAYERS:
+        update.message.reply_text(f"Ən az {MIN_PLAYERS} oyunçu lazımdır! ({len(game.players)}/{MIN_PLAYERS})")
+        return
+
+    if user.id not in game.owner and not _is_admin(context.bot, user, chat):
+        update.message.reply_text("Yalnız oyun yaradıcısı başlada bilər!")
+        return
+
+    lobby_msg_id = context.chat_data.get("lobby_msg_id")
+    _do_start_game(context, chat, game, lobby_msg_id)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /leave — Oyundan çıxma
+# ════════════════════════════════════════════════════════════════════════════════
+
+@user_locale
+def leave_game(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    try:
+        gm.leave_game(user, chat)
+        update.message.reply_text(f"🚪 {display_name(user)} oyundan çıxdı.")
+    except NoGameInChatError:
+        update.message.reply_text("Bu qrupda aktiv oyun yoxdur.")
+    except NotEnoughPlayersError:
+        update.message.reply_text("Oyunçu sayı azaldığı üçün oyun dayandırıldı.")
+        gm.end_game(chat, user)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /kick — Oyunçunu çıxar
+# ════════════════════════════════════════════════════════════════════════════════
+
+@user_locale
+def kick_player(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+
+    games = gm.chatid_games.get(chat.id, [])
+    if not games:
+        update.message.reply_text("Aktiv oyun yoxdur.")
+        return
+
+    game = games[-1]
+
+    if not user_is_creator_or_admin(user, game, context.bot, chat):
+        update.message.reply_text("Bu əmr yalnız oyun yaradıcısı üçündür.")
+        return
+
+    if not update.message.reply_to_message:
+        update.message.reply_text("Çıxarmaq istədiyiniz oyunçunun mesajına REPLY edin.")
+        return
+
+    kicked = update.message.reply_to_message.from_user
+    try:
+        gm.leave_game(kicked, chat)
+        update.message.reply_text(f"👢 {display_name(kicked)} oyundan çıxarıldı.")
+    except Exception as e:
+        update.message.reply_text(f"Xəta: {e}")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /close  /open — Lobbini bağla/aç
+# ════════════════════════════════════════════════════════════════════════════════
+
+@user_locale
+def close_game(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+    games = gm.chatid_games.get(chat.id, [])
+    if not games:
+        update.message.reply_text("Aktiv oyun yoxdur.")
+        return
+    game = games[-1]
+    if not user_is_creator_or_admin(user, game, context.bot, chat):
+        update.message.reply_text("Bu əmr yalnız yaradıcı üçündür.")
+        return
+    game.open = False
+    update.message.reply_text("🔒 Qeydiyyat bağlandı.")
+    lobby_msg_id = context.chat_data.get("lobby_msg_id")
+    if lobby_msg_id:
+        _update_lobby_message(context, chat.id, lobby_msg_id, game)
 
 
 @user_locale
 def open_game(update: Update, context: CallbackContext):
-    """Handler for the /open command"""
-    chat = update.message.chat
-    user = update.message.from_user
-    games = gm.chatid_games.get(chat.id)
-
+    chat = update.effective_chat
+    user = update.effective_user
+    games = gm.chatid_games.get(chat.id, [])
     if not games:
-        send_async(context.bot, chat.id,
-                   text=_("Bu Qrupda heç bir Oyun oynanılmır"))
+        update.message.reply_text("Aktiv oyun yoxdur.")
         return
-
     game = games[-1]
-
-    if user.id in game.owner:
-        game.open = True
-        send_async(context.bot, chat.id, text=_("Oyuna Qeydiyyat açıldı. Yeni oyunçular /join yazaraq oyuna qoşula bilərlər."))
+    if not user_is_creator_or_admin(user, game, context.bot, chat):
+        update.message.reply_text("Bu əmr yalnız yaradıcı üçündür.")
         return
-    else:
-        send_async(context.bot, chat.id,
-                   text=_("Ancaq Oyunu başladan({name}) bunu edə bilər.")
-                   .format(name=game.starter.first_name),
-                   reply_to_message_id=update.message.message_id)
-        return
+    game.open = True
+    update.message.reply_text("✅ Qeydiyyat açıldı.")
+    lobby_msg_id = context.chat_data.get("lobby_msg_id")
+    if lobby_msg_id:
+        _update_lobby_message(context, chat.id, lobby_msg_id, game)
 
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /stop — Oyunu dayandır
+# ════════════════════════════════════════════════════════════════════════════════
 
 @user_locale
-def enable_translations(update: Update, context: CallbackContext):
-    """Handler for the /enable_translations command"""
-    chat = update.message.chat
-    user = update.message.from_user
-    games = gm.chatid_games.get(chat.id)
-
+def stop_game(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+    games = gm.chatid_games.get(chat.id, [])
     if not games:
-        send_async(context.bot, chat.id,
-                   text=_("There is no running game in this chat."))
+        update.message.reply_text("Aktiv oyun yoxdur.")
         return
-
     game = games[-1]
-
-    if user.id in game.owner:
-        game.translate = True
-        send_async(context.bot, chat.id, text=_("Enabled multi-translations. "
-                                        "Disable with /disable_translations"))
+    if not user_is_creator_or_admin(user, game, context.bot, chat):
+        update.message.reply_text("Bu əmr yalnız yaradıcı/admin üçündür.")
         return
-
-    else:
-        send_async(context.bot, chat.id,
-                   text=_("Only the game creator ({name}) and admin can do that.")
-                   .format(name=game.starter.first_name),
-                   reply_to_message_id=update.message.message_id)
-        return
+    gm.end_game(chat, user)
+    update.message.reply_text("🛑 Oyun dayandırıldı.")
 
 
-@user_locale
-def disable_translations(update: Update, context: CallbackContext):
-    """Handler for the /disable_translations command"""
-    chat = update.message.chat
-    user = update.message.from_user
-    games = gm.chatid_games.get(chat.id)
+# ════════════════════════════════════════════════════════════════════════════════
+# /skip — Növbəni keç (vaxt aşımı)
+# ════════════════════════════════════════════════════════════════════════════════
 
-    if not games:
-        send_async(context.bot, chat.id,
-                   text=_("There is no running game in this chat."))
-        return
-
-    game = games[-1]
-
-    if user.id in game.owner:
-        game.translate = False
-        send_async(context.bot, chat.id, text=_("Disabled multi-translations. "
-                                        "Enable them again with "
-                                        "/enable_translations"))
-        return
-
-    else:
-        send_async(context.bot, chat.id,
-                   text=_("Only the game creator ({name}) and admin can do that.")
-                   .format(name=game.starter.first_name),
-                   reply_to_message_id=update.message.message_id)
-        return
-
-
-@game_locales
 @user_locale
 def skip_player(update: Update, context: CallbackContext):
-    """Handler for the /skip command"""
-    chat = update.message.chat
-    user = update.message.from_user
-
-    player = gm.player_for_user_in_chat(user, chat)
-    if not player:
-        send_async(context.bot, chat.id,
-                   text=_("Siz Oyun oynamırsız bu qrupda ."))
+    chat = update.effective_chat
+    user = update.effective_user
+    games = gm.chatid_games.get(chat.id, [])
+    if not games:
+        update.message.reply_text("Aktiv oyun yoxdur.")
+        return
+    game = games[-1]
+    if not game.started:
+        update.message.reply_text("Oyun hələ başlamayıb.")
         return
 
-    game = player.game
-    skipped_player = game.current_player
+    current = game.current_player
+    elapsed = (datetime.now() - current.turn_started).seconds
 
-    started = skipped_player.turn_started
-    now = datetime.now()
-    delta = (now - started).seconds
+    if elapsed < current.waiting_time and not user_is_creator_or_admin(user, game, context.bot, chat):
+        update.message.reply_text(
+            f"⏱ {display_name(current.user)} hələ {current.waiting_time - elapsed} saniyəsi var."
+        )
+        return
 
-    # You can't skip if the current player still has time left
-    # You can skip yourself even if you have time left (you'll still draw)
-    if delta < skipped_player.waiting_time and player != skipped_player:
-        n = skipped_player.waiting_time - delta
-        send_async(context.bot, chat.id,
-                   text=_("Zəhmət olmasa {time} saniyə gözləyin",
-                          "Zəhmət olmasa {time} saniyə gözləyin",
-                          n)
-                   .format(time=n),
-                   reply_to_message_id=update.message.message_id)
-    else:
-        do_skip(context.bot, player)
+    skipped_name = display_name(current.user)
+    game.turn()
+    update.message.reply_text(
+        f"⏭ {skipped_name} keçildi.\n"
+        f"İndi {display_name(game.current_player.user)}-in növbəsidir.",
+    )
 
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /notify_me — Yeni oyun bildirişi
+# ════════════════════════════════════════════════════════════════════════════════
+
+@user_locale
+def notify_me(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat.type == "private":
+        update.message.reply_text("Bu əmri qrupda istifadə edin.")
+        return
+    remind_dict.setdefault(chat.id, set()).add(user.id)
+    update.message.reply_text("🔔 Yeni oyun başladıqda sizə bildiriş göndəriləcək!")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# INLINE KART OYNAMA
+# ════════════════════════════════════════════════════════════════════════════════
 
 @game_locales
-@user_locale
+@db_session
 def reply_to_query(update: Update, context: CallbackContext):
-    """
-    Handler for inline queries.
-    Builds the result list for inline queries and answers to the client.
-    """
+    """Inline sorğunu emal edir — oyunçuya oynaya biləcəyi kartları göstərir."""
     results = list()
-    switch = None
+    user = update.inline_query.from_user
+    query = update.inline_query.query
+
+    add_served_user(user.id)
 
     try:
-        user = update.inline_query.from_user
-        user_id = user.id
-        players = gm.userid_players[user_id]
-        player = gm.userid_current[user_id]
+        player = gm.userid_current.get(user.id)
+        if not player:
+            add_no_game(results)
+            answer_inline(context.bot, update.inline_query.id, results)
+            return
+
         game = player.game
-    except KeyError:
-        add_no_game(results)
-    else:
 
-        # The game has not started.
-        # The creator may change the game mode, other users just get a "game has not started" message.
+        # Oyun rejimi seçimi
+        if query.startswith("mode_"):
+            mode = query.split("_", 1)[1]
+            if mode in ("classic", "fast", "wild", "text"):
+                game.set_mode(mode)
+            add_mode_classic(results)
+            add_mode_fast(results)
+            add_mode_wild(results)
+            add_mode_text(results)
+            answer_inline(context.bot, update.inline_query.id, results)
+            return
+
         if not game.started:
-            if user_is_creator(user, game):
-                add_mode_classic(results)
-                add_mode_fast(results)
-                add_mode_wild(results)
-                add_mode_text(results)
-            else:
-                add_not_started(results)
+            add_not_started(results)
+            answer_inline(context.bot, update.inline_query.id, results)
+            return
 
-
-        elif user_id == game.current_player.user.id:
-            if game.choosing_color:
-                add_choose_color(results, game)
-                add_other_cards(player, results, game)
-            else:
-                if not player.drew:
-                    add_draw(player, results)
-
-                else:
-                    add_pass(results, game)
-
-                if game.last_card.special == c.DRAW_FOUR and game.draw_counter:
-                    add_call_bluff(results, game)
-
-                playable = player.playable_cards()
-                added_ids = list()  # Duplicates are not allowed
-
-                for card in sorted(player.cards):
-                    add_card(game, card, results,
-                             can_play=(card in playable and
-                                            str(card) not in added_ids))
-                    added_ids.append(str(card))
-
-                add_gameinfo(game, results)
-
-        elif user_id != game.current_player.user.id or not game.started:
-            for card in sorted(player.cards):
-                add_card(game, card, results, can_play=False)
-
-        else:
+        if player != game.current_player:
             add_gameinfo(game, results)
+            add_other_cards(player, results, game)
+            answer_inline(context.bot, update.inline_query.id, results)
+            return
 
-        for result in results:
-            result.id += ':%d' % player.anti_cheat
+        if game.choosing_color:
+            add_choose_color(results, game)
+            add_other_cards(player, results, game)
+            answer_inline(context.bot, update.inline_query.id, results)
+            return
 
-        if players and game and len(players) > 1:
-            switch = _('İndiki Oyun: {game}').format(game=game.chat.title)
+        playable = player.playable_cards()
 
-    answer_async(context.bot, update.inline_query.id, results, cache_time=0,
-                 switch_pm_text=switch, switch_pm_parameter='select')
+        if not player.drew:
+            add_draw(player, results)
 
+        if player.drew or game.draw_counter:
+            add_pass(results, game)
+
+        if len(player.cards) == 1:
+            results.insert(0, InlineQueryResultArticle(
+                "uno",
+                title="🎴 UNO!",
+                description="Son kartınız!",
+                input_message_content=InputTextMessageContent("🎴 UNO!")
+            ))
+
+        # Bluff çağırma (draw_four sonrası)
+        if (game.last_card.special == c.DRAW_FOUR and
+                game.current_player == player and
+                not player.drew):
+            add_call_bluff(results, game)
+
+        for card in sorted(player.cards):
+            add_card(game, card, results, card in playable)
+
+        add_other_cards(player, results, game)
+
+    except Exception as e:
+        logger.error(f"reply_to_query xətası: {e}", exc_info=True)
+        add_no_game(results)
+
+    answer_inline(context.bot, update.inline_query.id, results)
+
+
+def answer_inline(bot, query_id, results):
+    try:
+        bot.answer_inline_query(
+            query_id, results,
+            cache_time=0,
+            is_personal=True,
+        )
+    except Exception as e:
+        logger.warning(f"answer_inline xətası: {e}")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# CHOSEN INLINE RESULT — Kart seçildi
+# ════════════════════════════════════════════════════════════════════════════════
 
 @game_locales
-@user_locale
+@db_session
 def process_result(update: Update, context: CallbackContext):
-    """
-    Handler for chosen inline results.
-    Checks the players actions and acts accordingly.
-    """
+    """Seçilən kartı emal edir."""
     try:
         user = update.chosen_inline_result.from_user
-        player = gm.userid_current[user.id]
-        game = player.game
         result_id = update.chosen_inline_result.result_id
-        chat = game.chat
-    except (KeyError, AttributeError):
-        return
+        player = gm.userid_current.get(user.id)
 
-    logger.debug("Axtarılan nəticə: " + result_id)
+        if not player:
+            return
 
-    result_id, anti_cheat = result_id.split(':')
-    last_anti_cheat = player.anti_cheat
-    player.anti_cheat += 1
+        game = player.game
+        chat_id = game.chat.id
 
-    if result_id in ('hand', 'gameinfo', 'nogame'):
-        return
-    elif result_id.startswith('mode_'):
-        # First 5 characters are 'mode_', the rest is the gamemode.
-        mode = result_id[5:]
-        game.set_mode(mode)
-        logger.info("Oyun modu dəyişildi {mode}".format(mode = mode))
-        send_async(context.bot, chat.id, text=__("Oyun modu dəyişildi {mode}".format(mode = mode)))
-        return
-    elif len(result_id) == 36:  # UUID result
-        return
-    elif int(anti_cheat) != last_anti_cheat:
-        send_async(context.bot, chat.id,
-                   text=__("Fırıldaq cəhdi edən {name}", multi=game.translate)
-                   .format(name=display_name(player.user)))
-        return
-    elif result_id == 'call_bluff':
-        reset_waiting_time(context.bot, player)
-        do_call_bluff(context.bot, player)
-    elif result_id == 'draw':
-        reset_waiting_time(context.bot, player)
-        do_draw(context.bot, player)
-    elif result_id == 'pass':
-        game.turn()
-    elif result_id in c.COLORS:
-        game.choose_color(result_id)
+        # ─── Rəng seçimi ─────────────────────────────────────────────────────
+        if result_id in c.COLORS:
+            if game.choosing_color:
+                game.choose_color(result_id)
+                context.bot.send_message(
+                    chat_id,
+                    f"🎨 {display_name(user)} rəng seçdi: {display_color(result_id)}\n"
+                    f"İndi *{display_name(game.current_player.user)}*-in növbəsidir.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            return
+
+        # ─── Kart çək ────────────────────────────────────────────────────────
+        if result_id == "draw":
+            if player == game.current_player:
+                try:
+                    player.draw()
+                except Exception:
+                    context.bot.send_message(chat_id, "🃏 Dəstdə kart qalmadı.")
+                    return
+                n = game.draw_counter or 1
+                context.bot.send_message(
+                    chat_id,
+                    f"🃏 {display_name(user)} *{n}* kart götürdü.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            return
+
+        # ─── Pass ─────────────────────────────────────────────────────────────
+        if result_id == "pass":
+            if player == game.current_player and player.drew:
+                game.turn()
+                context.bot.send_message(
+                    chat_id,
+                    f"⏭ {display_name(user)} passsed.\n"
+                    f"İndi *{display_name(game.current_player.user)}*-in növbəsidir.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            return
+
+        # ─── Bluff çağır ─────────────────────────────────────────────────────
+        if result_id == "call_bluff":
+            if player == game.current_player:
+                _handle_bluff(context, game, player, chat_id)
+            return
+
+        # ─── Oyun rejimi dəyişikliyi ─────────────────────────────────────────
+        if result_id.startswith("mode_"):
+            mode = result_id[5:]
+            if user.id in game.owner or _is_admin(context.bot, user, game.chat):
+                game.set_mode(mode)
+                context.bot.send_message(chat_id, f"🎮 Oyun rejimi: *{mode}*", parse_mode=ParseMode.MARKDOWN)
+            return
+
+        # ─── UNO elan ────────────────────────────────────────────────────────
+        if result_id == "uno":
+            return
+
+        # ─── Kart oyna ────────────────────────────────────────────────────────
+        if player != game.current_player:
+            return
+
+        # Kartı tap
+        target_card = None
+        for card in player.cards:
+            if str(card) == result_id:
+                target_card = card
+                break
+
+        if not target_card or target_card not in player.playable_cards():
+            return
+
+        player.play(target_card)
+
+        with db_session:
+            us = UserSetting.get(id=user.id)
+            if us and us.stats:
+                us.cards_played += 1
+
+        # Kart mesajı
+        context.bot.send_message(
+            chat_id,
+            f"🃏 *{display_name(user)}*: {repr(target_card)}",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+        # Oyun bitdi mi?
+        if len(player.cards) == 0:
+            _on_player_finish(context, game, player, chat_id)
+            return
+
+        # Rəng seçim lazımdırsa
+        if game.choosing_color:
+            context.bot.send_message(
+                chat_id,
+                f"🎨 *{display_name(user)}* rəng seçməlidir! Inline menyudan seçin.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        # Növbəti oyunçu
+        context.bot.send_message(
+            chat_id,
+            f"🎯 İndi *{display_name(game.current_player.user)}*-in növbəsidir.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    except Exception as e:
+        logger.error(f"process_result xətası: {e}", exc_info=True)
+
+
+def _handle_bluff(context, game, player, chat_id):
+    """Bluff yoxlanılır."""
+    bluffer = game.current_player.prev
+    if bluffer.bluffing:
+        context.bot.send_message(
+            chat_id,
+            f"😱 {display_name(bluffer.user)} *blöf etdi!* {display_name(player.user)} 4 əvəzinə 2 kart götürür.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        game.draw_counter = 2
     else:
-        reset_waiting_time(context.bot, player)
-        do_play_card(context.bot, player, result_id)
-
-    if game_is_running(game):
-        nextplayer_message = (
-            __("Növbəti oyunçu: {name}", multi=game.translate)
-            .format(name=display_name(game.current_player.user)))
-        choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
-        send_async(context.bot, chat.id,
-                        text=nextplayer_message,
-                        reply_markup=InlineKeyboardMarkup(choice))
-        start_player_countdown(context.bot, game, context.job_queue)
-
-
-def reset_waiting_time(bot, player):
-    """Resets waiting time for a player and sends a notice to the group"""
-    chat = player.game.chat
-
-    if player.waiting_time < WAITING_TIME:
-        player.waiting_time = WAITING_TIME
-        send_async(bot, chat.id,
-                   text=__("{name} gözləmə vaxtı yeniləndi: {time} "
-                           "saniyə", multi=player.game.translate)
-                   .format(name=display_name(player.user), time=WAITING_TIME))
+        context.bot.send_message(
+            chat_id,
+            f"😎 {display_name(bluffer.user)} blöf *etmədi!* {display_name(player.user)} 6 kart götürür.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        game.draw_counter = 6
+    try:
+        player.draw()
+    except Exception:
+        pass
+    game.turn()
 
 
-# Add all handlers to the dispatcher and run the bot
-dispatcher.add_handler(InlineQueryHandler(reply_to_query))
-dispatcher.add_handler(ChosenInlineResultHandler(process_result, pass_job_queue=True))
-dispatcher.add_handler(CallbackQueryHandler(select_game))
-dispatcher.add_handler(CommandHandler('start', start_game, pass_args=True, pass_job_queue=True))
-dispatcher.add_handler(CommandHandler('new', new_game))
-dispatcher.add_handler(CommandHandler('stop', kill_game))
-dispatcher.add_handler(CommandHandler('join', join_game))
-dispatcher.add_handler(CommandHandler('leave', leave_game))
-dispatcher.add_handler(CommandHandler('kick', kick_player))
-dispatcher.add_handler(CommandHandler('open', open_game))
-dispatcher.add_handler(CommandHandler('close', close_game))
-dispatcher.add_handler(CommandHandler('enablelrme_translationss',
-                                      enable_translations))
-dispatcher.add_handler(CommandHandler('disableleme_translationss',
-                                      disable_translations))
-dispatcher.add_handler(CommandHandler('skip', skip_player))
-dispatcher.add_handler(CommandHandler('notify_me', notify_me))
-simple_commands.register()
-settings.register()
-dispatcher.add_handler(MessageHandler(Filters.status_update, status_update))
-dispatcher.add_error_handler(error)
+def _on_player_finish(context: CallbackContext, game, player, chat_id: int):
+    """
+    Bir oyunçu bütün kartlarını bitirdikdə çağırılır.
+    Oyunçu finish_order-ə əlavə edilir.
+    Əgər yalnız 1 oyunçu qaldısa — o da sonuncu yer alır, oyun tamamilə bitir.
+    """
+    if not hasattr(game, "finish_order"):
+        game.finish_order = []
 
-start_bot(updater)
-updater.idle()
+    place = len(game.finish_order) + 1
+    game.finish_order.append((place, player.user, 0))
+
+    remaining_players = [p for p in game.players if p != player]
+
+    if len(remaining_players) <= 1:
+        # Sonuncu oyunçu da bitdi (və ya yalnız biri qaldı)
+        if len(remaining_players) == 1:
+            last_player = remaining_players[0]
+            last_place = len(game.finish_order) + 1
+            cards_left = len(last_player.cards)
+            game.finish_order.append((last_place, last_player.user, cards_left))
+
+        # Bütün nəticələri MongoDB-yə yaz
+        for finish_place, finish_user, _ in game.finish_order:
+            record_game_result(finish_user.id, finish_user.first_name, finish_place)
+            with db_session:
+                us = UserSetting.get(id=finish_user.id)
+                if us and us.stats:
+                    us.games_played += 1
+                    if finish_place == 1:
+                        us.first_places += 1
+
+        # Qalibiyyət mesajı
+        _announce_results(context, chat_id, game.finish_order)
+
+        # Oyunu bitir
+        gm.end_game(game.chat, player.user)
+
+    else:
+        # Oyun davam edir, bu oyunçu çıxır
+        context.bot.send_message(
+            chat_id,
+            f"🎉 *{display_name(player.user)}* {place}-ci yeri tutdu! (UNO!)\n"
+            f"Oyun davam edir — {len(remaining_players)} oyunçu qalıb.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        player.leave()
+        game.turn()
+
+        context.bot.send_message(
+            chat_id,
+            f"🎯 İndi *{display_name(game.current_player.user)}*-in növbəsidir.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /profile — Oyunçu profili
+# ════════════════════════════════════════════════════════════════════════════════
+
+def profile_command(update: Update, context: CallbackContext):
+    user = update.effective_user
+    add_served_user(user.id)
+
+    prof = get_profile(user.id)
+    if not prof:
+        update.message.reply_text(
+            "👤 Hələ profiliniz yoxdur.\nBir oyun oynayın! 🃏",
+        )
+        return
+
+    points = prof.get("total_points", 0)
+    level, rank_name, rank_emoji = get_rank(points)
+
+    text = (
+        f"👤 *Oyunçu: {display_name(user)}*\n\n"
+        f"🏅 *Rütbə:* {rank_emoji} {rank_name}\n"
+        f"⭐ *Səviyyə:* {level}\n\n"
+        f"🎮 *Oyun:* {prof.get('games_played', 0)}\n"
+        f"🏆 *Qələbə:* {prof.get('wins', 0)}\n"
+        f"💎 *Ümumi Xal:* {points}"
+    )
+    update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /rating — Top 25
+# ════════════════════════════════════════════════════════════════════════════════
+
+def rating_command(update: Update, context: CallbackContext):
+    top = get_top_ratings(25)
+    if not top:
+        update.message.reply_text("Reytinq siyahısı hələ boşdur. Oyun oynayın! 🃏")
+        return
+
+    PLACE_EMOJIS = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = ["👑 *UNO Reytinq Siyahısı (Top 25):*\n"]
+
+    for i, doc in enumerate(top, 1):
+        pts = doc.get("total_points", 0)
+        level, rank_name, rank_emoji = get_rank(pts)
+        name = doc.get("name", "Anonim")
+        wins = doc.get("wins", 0)
+        emoji = PLACE_EMOJIS.get(i, f"{i}.")
+        lines.append(
+            f"{emoji} *{name}* {rank_emoji}{level} _{rank_name}_\n"
+            f"   🏆 {wins} qələbə | 💎 {pts} xal"
+        )
+
+    update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# /broadcast — Bütün qrup+istifadəçilərə mesaj göndər
+# ════════════════════════════════════════════════════════════════════════════════
+
+def broadcast_command(update: Update, context: CallbackContext):
+    user = update.effective_user
+
+    if str(user.id) not in SUDO_USERS:
+        update.message.reply_text("⛔ Bu əmr yalnız adminlər üçündür.")
+        return
+
+    if not update.message.reply_to_message:
+        update.message.reply_text(
+            "✍️ Yaymaq istədiyiniz mesaja REPLY edərək /broadcast yazın.\n"
+            "(Şəkil, mətn, kanal postu — hər şey olar)"
+        )
+        return
+
+    source_chat = update.message.chat.id
+    source_msg = update.message.reply_to_message.message_id
+
+    status = update.message.reply_text("⚡ Broadcast başladı, gözləyin...")
+
+    sent_c, fail_c = 0, 0
+    for chat in get_served_chats():
+        cid = chat["chat_id"]
+        try:
+            context.bot.forward_message(cid, source_chat, source_msg)
+            sent_c += 1
+            time.sleep(0.05)
+        except Exception as e:
+            log_broadcast_error("chat", cid, str(e))
+            fail_c += 1
+
+    sent_u, fail_u = 0, 0
+    for u in get_served_users():
+        uid = u["user_id"]
+        try:
+            context.bot.forward_message(uid, source_chat, source_msg)
+            sent_u += 1
+            time.sleep(0.05)
+        except Exception as e:
+            log_broadcast_error("user", uid, str(e))
+            fail_u += 1
+
+    try:
+        status.edit_text(
+            f"✅ Broadcast tamamlandı!\n\n"
+            f"👥 Qruplar: {sent_c} uğurlu, {fail_c} uğursuz\n"
+            f"👤 İstifadəçilər: {sent_u} uğurlu, {fail_u} uğursuz"
+        )
+    except Exception:
+        pass
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Bot qrupa əlavə edildi — avtomatik yaddaşa yaz
+# ════════════════════════════════════════════════════════════════════════════════
+
+def new_member_handler(update: Update, context: CallbackContext):
+    """Bot qrupa əlavə olunanda avtomatik yaddaşa yazılır."""
+    bot_id = context.bot.id
+    for member in update.message.new_chat_members:
+        if member.id == bot_id:
+            add_served_chat(update.effective_chat.id)
+            context.bot.send_message(
+                update.effective_chat.id,
+                "✨ Məni bu qrupa əlavə etdiyiniz üçün təşəkkür edirəm! 😊\n\n"
+                "🃏 UNO oyununu başlatmaq üçün */new* yazın.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            break
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# HANDLER QEYDİYYATI
+# ════════════════════════════════════════════════════════════════════════════════
+
+def register_handlers():
+    # Activity middleware (hər mesajda çağırılır)
+    dispatcher.add_handler(
+        MessageHandler(Filters.all & ~Filters.command, _activity_register),
+        group=-1
+    )
+    dispatcher.add_handler(
+        MessageHandler(Filters.command, _activity_register),
+        group=-1
+    )
+
+    # Bot qrupa əlavə edildi
+    dispatcher.add_handler(
+        MessageHandler(Filters.status_update.new_chat_members, new_member_handler)
+    )
+
+    # Oyun əmrləri
+    dispatcher.add_handler(CommandHandler(["new", "uno"], new_game))
+    dispatcher.add_handler(CommandHandler("join", join_game))
+    dispatcher.add_handler(CommandHandler("start", start_game))
+    dispatcher.add_handler(CommandHandler("leave", leave_game))
+    dispatcher.add_handler(CommandHandler("kick", kick_player))
+    dispatcher.add_handler(CommandHandler("close", close_game))
+    dispatcher.add_handler(CommandHandler("open", open_game))
+    dispatcher.add_handler(CommandHandler("stop", stop_game))
+    dispatcher.add_handler(CommandHandler("skip", skip_player))
+    dispatcher.add_handler(CommandHandler("notify_me", notify_me))
+
+    # Profil və reytinq
+    dispatcher.add_handler(CommandHandler("profile", profile_command))
+    dispatcher.add_handler(CommandHandler("rating", rating_command))
+
+    # Broadcast (admin)
+    dispatcher.add_handler(CommandHandler("broadcast", broadcast_command))
+
+    # Lobby callback düymələri
+    dispatcher.add_handler(
+        CallbackQueryHandler(lobby_callback, pattern="^uno_(join|start)$")
+    )
+
+    # Inline kart oynama
+    dispatcher.add_handler(InlineQueryHandler(reply_to_query))
+    dispatcher.add_handler(ChosenInlineResultHandler(process_result))
+
+    # Köhnə əmrləri saxla (simple_commands.py və settings.py)
+    from simple_commands import register as sc_register
+    from settings import register as st_register
+    sc_register()
+    st_register()
+
+    logger.info("✅ Bütün handler-lər qeydiyyatdan keçdi.")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ANA PROQRAM
+# ════════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    register_handlers()
+    logger.info("🚀 UNO Bot başladı...")
+    from start_bot import start_bot
+    start_bot(updater)
