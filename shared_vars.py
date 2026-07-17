@@ -25,6 +25,7 @@ from telegram.ext import Updater
 
 from game_manager import GameManager
 from database import db
+from user_setting import UserSetting
 
 db.bind('sqlite', os.getenv('UNO_DB', 'uno.sqlite3'), create_db=True)
 db.generate_mapping(create_tables=True)
