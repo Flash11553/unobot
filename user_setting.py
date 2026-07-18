@@ -2,32 +2,89 @@
 # -*- coding: utf-8 -*-
 #
 # Telegram bot to play UNO in group chats
-# Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+# ARTIQ Pony ORM/SQLite ƏVƏZİNƏ MongoDB istifadə olunur. Bu sinif köhnə
+# Pony Entity ilə EYNİ İSTİFADƏ ÜSULUNU saxlayır ki, botun qalan hissəsi
+# (settings.py, actions.py, internationalization.py, simple_commands.py)
+# HEÇ DƏYİŞMƏDƏN işləməyə davam etsin:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
+#   UserSetting.get(id=user.id)   -> obyekt və ya None
+#   UserSetting(id=user.id)       -> yeni qeyd yaradır və qaytarır
+#   us.stats = True               -> DƏRHAL Mongo-ya yazılır
+#   us.games_played += 1          -> DƏRHAL Mongo-ya yazılır
 #
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Əlavə olaraq "level" və "rank_name" sahələri saxlanılır və hər dəfə
+# first_places (qələbə sayı) dəyişəndə avtomatik yenidən hesablanır.
 
-
-from pony.orm import Optional, PrimaryKey
 from database import db
+from levels import compute_level
+
+users_collection = db["user_settings"] if db is not None else None
+
+_DEFAULT_LEVEL, _DEFAULT_RANK = compute_level(0)
+
+DEFAULTS = {
+    "lang": "",
+    "stats": False,
+    "first_places": 0,
+    "games_played": 0,
+    "cards_played": 0,
+    "use_keyboards": False,
+    "name": "",
+    "level": _DEFAULT_LEVEL,
+    "rank_name": _DEFAULT_RANK,
+}
 
 
-class UserSetting(db.Entity):
+class UserSetting:
+    """MongoDB-də saxlanılan istifadəçi ayarları/statistikası."""
 
-    id = PrimaryKey(int, auto=False, size=64)  # Telegram User ID
-    lang = Optional(str, default='')  # The language setting for this user
-    stats = Optional(bool, default=False)  # Opt-in to keep game statistics
-    first_places = Optional(int, default=0)  # Nr. of games won in first place
-    games_played = Optional(int, default=0)  # Nr. of games completed
-    cards_played = Optional(int, default=0)  # Nr. of cards played total
-    use_keyboards = Optional(bool, default=False)  # Use keyboards (unused)
+    def __init__(self, id):
+        doc = dict(DEFAULTS)
+        doc["_id"] = id
+        if users_collection is not None:
+            users_collection.update_one(
+                {"_id": id}, {"$setOnInsert": doc}, upsert=True
+            )
+            doc = users_collection.find_one({"_id": id}) or doc
+        self.__dict__["id"] = id
+        for k, v in DEFAULTS.items():
+            self.__dict__[k] = doc.get(k, v)
+
+    @classmethod
+    def get(cls, id):
+        if users_collection is None:
+            return None
+        doc = users_collection.find_one({"_id": id})
+        if not doc:
+            return None
+        obj = cls.__new__(cls)
+        obj.__dict__["id"] = id
+        for k, v in DEFAULTS.items():
+            obj.__dict__[k] = doc.get(k, v)
+        return obj
+
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+
+        if name == "id":
+            return
+
+        if users_collection is not None:
+            users_collection.update_one(
+                {"_id": self.id}, {"$set": {name: value}}, upsert=True
+            )
+
+        # Qələbə sayı dəyişəndə səviyyə/rütbəni avtomatik yenilə
+        if name == "first_places":
+            level, rank_name = compute_level(value)
+            if (level != self.__dict__.get("level") or
+                    rank_name != self.__dict__.get("rank_name")):
+                self.__dict__["level"] = level
+                self.__dict__["rank_name"] = rank_name
+                if users_collection is not None:
+                    users_collection.update_one(
+                        {"_id": self.id},
+                        {"$set": {"level": level, "rank_name": rank_name}},
+                        upsert=True,
+                    )

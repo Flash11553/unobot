@@ -12,6 +12,7 @@ from apscheduler.jobstores.base import JobLookupError
 from config import TIME_REMOVAL_AFTER_SKIP, MIN_FAST_TURN_TIME
 from errors import DeckEmptyError, NotEnoughPlayersError
 from internationalization import __, _
+from levels import compute_level, place_label
 from shared_vars import gm
 from user_setting import UserSetting
 from utils import send_async, display_name, game_is_running
@@ -82,6 +83,24 @@ def do_skip(bot, player, job_queue=None):
 
 
 
+def send_final_standings(bot, chat_id, game):
+    """Domino botundakı kimi, oyun TAM bitəndə (son oyunçu da bitirəndə)
+    hamının yerini (1-ci, 2-ci, 3-cü ...) səviyyə/rütbəsi ilə göstərir."""
+    lines = []
+    for i, finisher_user in enumerate(game.finish_order, start=1):
+        us = UserSetting.get(id=finisher_user.id)
+        wins = us.first_places if us else 0
+        _level, rank_name = compute_level(wins)
+        lines.append(
+            f"{place_label(i)}: *{display_name(finisher_user)}* — {rank_name}"
+        )
+
+    result_message = (
+        "🎉 *OYUN BAŞA ÇATDI!* 🎉\n\n" + "\n".join(lines)
+    )
+    send_async(bot, chat_id, text=result_message, parse_mode="Markdown")
+
+
 def do_play_card(bot, player, result_id):
     """Seçilmiş kartı masaya qoyur və ehtiyac olarsa, qrupa oyun vəziyyəti ilə bağlı məlumat göndərir."""
     card = c.from_str(result_id)
@@ -104,12 +123,21 @@ def do_play_card(bot, player, result_id):
         send_async(bot, chat.id, text="UNO!")
 
     if len(player.cards) == 0:
-        send_async(bot, chat.id,
-                   text=__("{name} qalib gəldi!", multi=game.translate)
-                   .format(name=user.first_name))
+        place = len(game.finish_order) + 1
+        game.finish_order.append(user)
+
+        if place == 1:
+            send_async(bot, chat.id,
+                       text=__("🏆 {name} UNO edib qalib gəldi! (1-ci yer)", multi=game.translate)
+                       .format(name=user.first_name))
+        else:
+            send_async(bot, chat.id,
+                       text=__("🎉 {name} oyunu {place}-cü yerdə bitirdi!", multi=game.translate)
+                       .format(name=user.first_name, place=place))
 
         if us.stats:
             us.games_played += 1
+            us.name = display_name(user)
 
             if game.players_won == 0:
                 us.first_places += 1
@@ -119,12 +147,17 @@ def do_play_card(bot, player, result_id):
         try:
             gm.leave_game(user, chat)
         except NotEnoughPlayersError:
-            send_async(bot, chat.id,
-                       text=__("Oyun Bitdi!", multi=game.translate))
+            last_player = game.current_player.user
+            game.finish_order.append(last_player)
 
-            us2 = UserSetting.get(id=game.current_player.user.id)
-            if us2 and us2.stats:
+            send_final_standings(bot, chat.id, game)
+
+            us2 = UserSetting.get(id=last_player.id)
+            if not us2:
+                us2 = UserSetting(id=last_player.id)
+            if us2.stats:
                 us2.games_played += 1
+                us2.name = display_name(last_player)
 
             gm.end_game(chat, user)
 

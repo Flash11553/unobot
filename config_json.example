@@ -1,0 +1,16 @@
+{
+    "token": "TOKEN",
+    "mongo_url": "MONGO_CONNECTION_STRING",
+    "sudo_users": [0],
+    "admin_list": [0],
+    "open_lobby": true,
+    "enable_translations": true,
+    "workers": 32,
+    "default_gamemode": "fast",
+    "waiting_time": 120,
+    "time_removal_after_skip": 20,
+    "min_fast_turn_time": 15,
+    "min_players": 2,
+    "max_players": 10,
+    "lobby_timeout_minutes": 5
+}

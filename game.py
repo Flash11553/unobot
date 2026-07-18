@@ -48,6 +48,13 @@ class Game(object):
 
         self.logger = logging.getLogger(__name__)
 
+        # 🟢 Qeydiyyat (lobby) menyusu üçün
+        self.lobby_message_id = None
+        self.last_lobby_activity = datetime.now()
+
+        # 🟢 Oyunçuların bitirmə sırası (1-ci, 2-ci, 3-cü ... üçün)
+        self.finish_order = []
+
     @property
     def players(self):
         """Returns a list of all players in this game"""

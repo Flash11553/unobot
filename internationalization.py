@@ -22,7 +22,6 @@ import gettext
 from functools import wraps
 
 from locales import available_locales
-from pony.orm import db_session
 from user_setting import UserSetting
 from shared_vars import gm
 
@@ -100,12 +99,10 @@ def __(singular, plural=None, n=1, multi=False):
 
 def user_locale(func):
     @wraps(func)
-    @db_session
     def wrapped(update, context, *pargs, **kwargs):
         user = _user_chat_from_update(update)[0]
 
-        with db_session:
-            us = UserSetting.get(id=user.id)
+        us = UserSetting.get(id=user.id)
 
         if us and us.lang != 'en':
             _.push(us.lang)
@@ -120,7 +117,6 @@ def user_locale(func):
 
 def game_locales(func):
     @wraps(func)
-    @db_session
     def wrapped(update, context, *pargs, **kwargs):
         user, chat = _user_chat_from_update(update)
         player = gm.player_for_user_in_chat(user, chat)

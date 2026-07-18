@@ -3,65 +3,86 @@
 #
 # Telegram bot to play UNO in group chats
 # Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
-# Licensed under AGPL v3
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import random
-from errors import DeckEmptyError
+
+from random import shuffle
+import logging
+
 import card as c
+from card import Card
+from errors import DeckEmptyError
 
 
 class Deck(object):
+    """ This class represents a deck of cards """
+
     def __init__(self):
         self.cards = list()
         self.graveyard = list()
+        self.logger = logging.getLogger(__name__)
 
-    def _fill_classic_(self):
-        """Fill the deck with a standard UNO deck"""
-        self.cards = list()
-        for color in c.COLORS:
-            # 0 appears once, 1-9 appear twice
-            self.cards.append(c.Card(color, '0'))
-            for value in c.NUMBERS[1:]:
-                self.cards.append(c.Card(color, value))
-            # Skip, Reverse, Draw Two × 2 each
-            for _ in range(2):
-                for special in c.SPECIAL_CARD_TYPES:
-                    self.cards.append(c.Card(color, special))
-        # Wild cards × 4 each
-        for _ in range(4):
-            self.cards.append(c.Card(None, None, c.CHOOSE))
-            self.cards.append(c.Card(None, None, c.DRAW_FOUR))
-        random.shuffle(self.cards)
+        self.logger.debug(self.cards)
 
-    def _fill_wild_(self):
-        """Fill deck with wild mode (more specials)"""
-        self.cards = list()
-        for color in c.COLORS:
-            self.cards.append(c.Card(color, '0'))
-            for value in ['1', '2', '3', '4', '5']:
-                self.cards.append(c.Card(color, value))
-            for _ in range(3):
-                for special in c.SPECIAL_CARD_TYPES:
-                    self.cards.append(c.Card(color, special))
-        for _ in range(8):
-            self.cards.append(c.Card(None, None, c.CHOOSE))
-            self.cards.append(c.Card(None, None, c.DRAW_FOUR))
-        random.shuffle(self.cards)
+    def shuffle(self):
+        """Shuffles the deck"""
+        self.logger.debug("Kartları qarışdırır")
+        shuffle(self.cards)
 
     def draw(self):
-        """Draw a card from the deck"""
+        """Draws a card from this deck"""
         try:
-            return self.cards.pop()
+            card = self.cards.pop()
+            self.logger.debug("Kart Götürülür" + str(card))
+            return card
         except IndexError:
-            if self.graveyard:
-                self.cards = self.graveyard
-                self.graveyard = list()
-                random.shuffle(self.cards)
-                return self.cards.pop()
+            if len(self.graveyard):
+                while len(self.graveyard):
+                    self.cards.append(self.graveyard.pop())
+                self.shuffle()
+                return self.draw()
             else:
                 raise DeckEmptyError()
 
     def dismiss(self, card):
-        """Add a card to the graveyard"""
-        if card:
-            self.graveyard.append(card)
+        """Returns a card to the deck"""
+        if card.special:
+            card.color = None
+        self.graveyard.append(card)
+
+    def _fill_classic_(self):
+        # Fill deck with the classic card set
+        self.cards.clear()
+        for color in c.COLORS:
+            for value in c.VALUES:
+                self.cards.append(Card(color, value))
+                if not value == c.ZERO:
+                    self.cards.append(Card(color, value))
+        for special in c.SPECIALS:
+            for _ in range(4):
+                self.cards.append(Card(None, None, special=special))
+        self.shuffle()
+
+    def _fill_wild_(self):
+        # Fill deck with a wild card set
+        self.cards.clear()
+        for color in c.COLORS:
+            for value in c.WILD_VALUES:
+                for _ in range(4):
+                    self.cards.append(Card(color, value))
+        for special in c.SPECIALS:
+            for _ in range(6):
+                self.cards.append(Card(None, None, special=special))
+        self.shuffle()

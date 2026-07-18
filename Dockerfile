@@ -21,7 +21,7 @@ USER        nobody
 RUN         cd locales && \
             find . -maxdepth 2 -type d -name 'LC_MESSAGES' -exec ash -c 'msgfmt {}/unobot.po -o {}/unobot.mo' \;
 
-VOLUME      /app/data
-ENV         UNO_DB=/app/data/uno.sqlite3
+# Bütün data (statistika/reytinq/broadcast) artıq MongoDB-də saxlanılır.
+# TOKEN və MONGO mühit dəyişənləri .env faylı ilə verilir (bax: config.py).
 
 ENTRYPOINT  [ "python", "bot.py" ]

@@ -2,23 +2,38 @@
 # -*- coding: utf-8 -*-
 #
 # Telegram bot to play UNO in group chats
-# Copyright (c) 2016 Jannes Höke <uno@jhoeke.de>
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
+# Bütün məlumatlar (istifadəçi statistikası, reytinq, broadcast siyahıları)
+# artıq SQLite/Pony ƏVƏZİNƏ MongoDB-də saxlanılır. Bağlantı sətri koda
+# YAZILMIR - serverdə .env faylında MONGO dəyişəni kimi verilir:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
+#   TOKEN=xxxxx
+#   MONGO=mongodb+srv://user:pass@host/?appName=...
 #
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# Bu fayl botun hər yerindən "from database import db" ilə istifadə
+# edilən tək MongoDB bağlantısını yaradır.
 
+import logging
 
-from pony.orm import Database
+from pymongo import MongoClient
 
-# Database singleton
-db = Database()
+from config import MONGO_URL
+
+logger = logging.getLogger(__name__)
+
+db = None
+
+if not MONGO_URL:
+    logger.error(
+        "MONGO mühit dəyişəni tapılmadı! .env faylına MONGO=... əlavə edin. "
+        "Mongo olmadan statistika/reytinq/broadcast işləməyəcək."
+    )
+else:
+    try:
+        _client = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+        _client.admin.command("ping")
+        db = _client["uno_bot_db"]
+        logger.info("MongoDB bağlantısı uğurlu.")
+    except Exception as e:
+        logger.error(f"MongoDB bağlantı xətası: {e}. Statistika/reytinq/broadcast işləməyəcək.")
+        db = None

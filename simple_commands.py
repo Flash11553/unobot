@@ -1,11 +1,19 @@
+import re
+
 from telegram import ParseMode, Update
 from telegram.ext import CommandHandler, CallbackContext
 
-from user_setting import UserSetting
+from user_setting import UserSetting, users_collection
+from levels import compute_level
 from utils import send_async
 from shared_vars import dispatcher
 from internationalization import _, user_locale
 from promotions import send_promotion
+
+
+def escape_markdown_symbols(text):
+    """Markdown-da problem yaratmasın deyə * və _ simvollarını escape edir."""
+    return re.sub(r'([*_])', r'\\\1', text or "")
 
 @user_locale
 def help_handler(update: Update, context: CallbackContext):
@@ -80,43 +88,65 @@ def news(update: Update, context: CallbackContext):
                disable_web_page_preview=True)
 
 @user_locale
-def stats(update: Update, context: CallbackContext):
+def profile_handler(update: Update, context: CallbackContext):
+    """Handler for the /profile command - şəxsi statistika kartı"""
     user = update.message.from_user
     us = UserSetting.get(id=user.id)
-    if not us:
+    if not us or not us.stats:
         send_async(context.bot, update.message.chat_id,
-                   text=_("Sizin Statistikanız hələ mövcud deyil. Əvvəlcə bir oyun oynamaq lazımdır."))
-    else:
-        stats_text = list()
+                   text=_("Sizin Statistikanız hələ mövcud deyil. Statistikanı "
+                          "aktivləşdirmək üçün /settings yazın və bir oyun oynayın."))
+        return
 
-        n = us.games_played  
-        stats_text.append(  
-            _("{number} oyun oynanılıb",  
-              "{number} oyun oynanılıb",  
-              n).format(number=n)  
-        )  
+    level, rank_name = compute_level(us.first_places)
 
-        n = us.first_places  
-        m = round((us.first_places / us.games_played) * 100) if us.games_played else 0  
-        stats_text.append(  
-            _("{number} birinci yer({percent}%)",  
-              "{number} birinci yerlər ({percent}%)",  
-              n).format(number=n, percent=m)  
-        )  
+    profile_text = (
+        "👤 Oyunçu\n\n"
+        f"🏅 Rütbə: {rank_name}\n"
+        f"⭐ Səviyyə: {level}\n\n"
+        f"🎮 Oyun: {us.games_played}\n"
+        f"🏆 Qələbə: {us.first_places}\n"
+    )
 
-        n = us.cards_played  
-        stats_text.append(  
-            _("{number} kart oynanılıb",  
-              "{number} kart oynanılıb",  
-              n).format(number=n)  
-        )  
+    send_async(context.bot, update.message.chat_id, text=profile_text)
 
-        send_async(context.bot, update.message.chat_id,  
-                   text='\n'.join(stats_text))
+
+@user_locale
+def rating_leaderboard(update: Update, context: CallbackContext):
+    """Handler for the /rating command - ən çox qələbə qazanan 25 oyunçu"""
+    if users_collection is None:
+        send_async(context.bot, update.message.chat_id,
+                   text=_("Reytinq siyahısı hazırda əlçatan deyil."))
+        return
+
+    top = list(
+        users_collection.find({"stats": True, "first_places": {"$gt": 0}})
+        .sort("first_places", -1)
+        .limit(25)
+    )
+
+    if not top:
+        send_async(context.bot, update.message.chat_id,
+                   text=_("Reytinq siyahısı hələ boşdur. Oyun oynayın və qalib gəlin!"))
+        return
+
+    rating_message = "👑 *UNO Reytinq Siyahısı:*\n\n"
+    for i, doc in enumerate(top, start=1):
+        name = escape_markdown_symbols(doc.get("name") or "Anonim")
+        wins = doc.get("first_places", 0)
+        level, rank_name = doc.get("level"), doc.get("rank_name")
+        if level is None or rank_name is None:
+            level, rank_name = compute_level(wins)
+        rating_message += f"{i}. {name} — {rank_name} ⭐{level} — *{wins} qələbə*\n"
+
+    send_async(context.bot, update.message.chat_id, text=rating_message,
+               parse_mode=ParseMode.MARKDOWN)
+
 
 def register():
     dispatcher.add_handler(CommandHandler('help', help_handler))
     dispatcher.add_handler(CommandHandler('yrjrj', source))
     dispatcher.add_handler(CommandHandler('newsdusi', news))
-    dispatcher.add_handler(CommandHandler('rating', stats))
+    dispatcher.add_handler(CommandHandler('rating', rating_leaderboard))
+    dispatcher.add_handler(CommandHandler('profile', profile_handler))
     dispatcher.add_handler(CommandHandler('modesdkdk', modes))
