@@ -30,9 +30,10 @@ import card as c
 import settings
 import simple_commands
 import broadcast
+from broadcast_store import add_served_chat, add_served_user
 from actions import (do_skip, do_play_card, do_draw, do_call_bluff,
-                     start_player_countdown, process_departure)
-from config import WAITING_TIME, DEFAULT_GAMEMODE, MIN_PLAYERS, MAX_PLAYERS, LOBBY_TIMEOUT_MINUTES
+                     process_departure)
+from config import DEFAULT_GAMEMODE, MIN_PLAYERS, MAX_PLAYERS, LOBBY_TIMEOUT_MINUTES
 from errors import (NoGameInChatError, LobbyClosedError, AlreadyJoinedError,
                     NotEnoughPlayersError, DeckEmptyError)
 from internationalization import _, __, user_locale, game_locales
@@ -79,6 +80,9 @@ def notify_me(update: Update, context: CallbackContext):
 def new_game(update: Update, context: CallbackContext):
     """Handler for the /new (and /uno) command"""
     chat_id = update.message.chat_id
+
+    add_served_chat(chat_id)
+    add_served_user(update.message.from_user.id)
 
     if update.message.chat.type == 'private':
         _group_only_notice(update, context)
@@ -425,13 +429,32 @@ def perform_game_start(bot, job_queue, chat, game):
                         timeout=TIMEOUT)
 
     dispatcher.run_async(send_first)
-    start_player_countdown(bot, game, job_queue)
 
 
 def start_game(update: Update, context: CallbackContext):
-    """Handler for the /start command - artıq sadəcə /help mesajını göstərir.
-    Oyunu başlatmaq üçün YALNIZ qeydiyyat menyusundakı 'Oyunu Başlat ▶️'
-    düyməsi istifadə olunur."""
+    """Handler for the /start command.
+    Əgər qrupda açıq qeydiyyat menyusu varsa, /start elə "Oyunu Başlat ▶️"
+    düyməsi kimi işləyir və oyunu başladır. Əks halda (və şəxsi mesajda)
+    sadəcə /help mesajını göstərir."""
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if user:
+        add_served_user(user.id)
+    if chat is not None and chat.type != 'private':
+        add_served_chat(chat.id)
+
+    if chat is not None and chat.type != 'private':
+        lobby = get_open_lobby(chat.id)
+        if lobby is not None:
+            if len(lobby.players) < MIN_PLAYERS:
+                send_async(context.bot, chat.id,
+                           text=__("Ən azından {minplayers} oyunçu qoşulmalıdır oyuna, "
+                                  "sizin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
+                return
+            perform_game_start(context.bot, context.job_queue, chat, lobby)
+            return
+
     help_handler(update, context)
 
 
@@ -559,8 +582,8 @@ def disable_translations(update: Update, context: CallbackContext):
 @game_locales
 @user_locale
 def skip_player(update: Update, context: CallbackContext):
-    """Handler for the /skip command - dərhal növbəti oyunçuya keçir,
-    gözləmə vaxtı yoxlanılmır."""
+    """Handler for the /skip command - sıradakı oyunçunu oyundan çıxarır
+    (yalnız 3+ oyunçu qalanda mümkündür) və növbəni keçirir."""
     chat = update.message.chat
     user = update.message.from_user
 
@@ -581,7 +604,7 @@ def skip_player(update: Update, context: CallbackContext):
                    text=_("Oyun hələ başlamayıb."))
         return
 
-    do_skip(context.bot, game.current_player, context.job_queue)
+    do_skip(context.bot, game)
 
 
 @game_locales
@@ -697,17 +720,14 @@ def process_result(update: Update, context: CallbackContext):
                    .format(name=display_name(player.user)))
         return
     elif result_id == 'call_bluff':
-        reset_waiting_time(context.bot, player)
         do_call_bluff(context.bot, player)
     elif result_id == 'draw':
-        reset_waiting_time(context.bot, player)
         do_draw(context.bot, player)
     elif result_id == 'pass':
         game.turn()
     elif result_id in c.COLORS:
         game.choose_color(result_id)
     else:
-        reset_waiting_time(context.bot, player)
         do_play_card(context.bot, player, result_id)
 
     if game_is_running(game):
@@ -718,19 +738,6 @@ def process_result(update: Update, context: CallbackContext):
         send_async(context.bot, chat.id,
                         text=nextplayer_message,
                         reply_markup=InlineKeyboardMarkup(choice))
-        start_player_countdown(context.bot, game, context.job_queue)
-
-
-def reset_waiting_time(bot, player):
-    """Resets waiting time for a player and sends a notice to the group"""
-    chat = player.game.chat
-
-    if player.waiting_time < WAITING_TIME:
-        player.waiting_time = WAITING_TIME
-        send_async(bot, chat.id,
-                   text=__("{name} gözləmə vaxtı yeniləndi: {time} "
-                           "saniyə", multi=player.game.translate)
-                   .format(name=display_name(player.user), time=WAITING_TIME))
 
 
 # Add all handlers to the dispatcher and run the bot
@@ -761,7 +768,10 @@ dispatcher.add_handler(MessageHandler(Filters.status_update, status_update))
 dispatcher.add_error_handler(error)
 
 # 🟢 5 dəqiqədən bir başlamamış qeydiyyat (lobby) menyularını yoxlayır
-updater.job_queue.run_repeating(check_inactive_lobbies_job, interval=60, first=60)
+# 🟢 5 dəqiqədən bir yox, hər 20 saniyədən bir yoxlanılır - həm qeydiyyat
+# (lobby), həm də artıq başlamış hərəkətsiz oyunlar üçün YEGANƏ avtomatik
+# bitirmə mexanizmi budur
+updater.job_queue.run_repeating(check_inactive_lobbies_job, interval=20, first=20)
 
 start_bot(updater)
 updater.idle()

@@ -23,7 +23,6 @@ from datetime import datetime
 
 import card as c
 from errors import DeckEmptyError
-from config import WAITING_TIME
 
 
 class Player(object):
@@ -55,7 +54,6 @@ class Player(object):
         self.drew = False
         self.anti_cheat = 0
         self.turn_started = datetime.now()
-        self.waiting_time = WAITING_TIME
 
     def draw_first_hand(self):
         try:

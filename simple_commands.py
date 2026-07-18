@@ -4,11 +4,12 @@ from telegram import ParseMode, Update
 from telegram.ext import CommandHandler, CallbackContext
 
 from user_setting import UserSetting, users_collection
-from levels import compute_level
+from levels import compute_level, LEVELS
 from utils import send_async
 from shared_vars import dispatcher
 from internationalization import _, user_locale
 from promotions import send_promotion
+from broadcast_store import add_served_chat, add_served_user
 
 
 def escape_markdown_symbols(text):
@@ -18,20 +19,33 @@ def escape_markdown_symbols(text):
 @user_locale
 def help_handler(update: Update, context: CallbackContext):
     """Handler for the /help command"""
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat is not None:
+        if chat.type == 'private':
+            if user:
+                add_served_user(user.id)
+        else:
+            add_served_chat(chat.id)
+            if user:
+                add_served_user(user.id)
+
     help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
       "\n"
       "1️⃣ Bu botu qrupunuza əlavə edin\n"
-      "2️⃣ Qrupda /new yazaraq yeni oyun yaradın və ya /join ilə mövcud oyuna qoşulun\n"
-      "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra /start yazaraq oyunu başladın\n"
+      "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və ya \"Oyuna Qoşul\" düyməsi ilə mövcud oyuna qoşulun\n"
+      "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra \"Oyunu Başlat\" düyməsi ilə oyunu başladın\n"
       "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
       "\n"
       "👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
       "🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
-      "⏱ Əgər bir oyunçu 120 saniyədən çox gözlənilirsə, onu /skip ilə keçə bilərsiniz\n"
+      "⛔ /skip yalnız 3 və ya daha çox oyunçu qalanda sıradakı oyunçunu keçir\n"
       "🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
       "\n"
-      "⚙️ Statiskanızı görmək üçün:\n"
-      "💎 /stats \n"
+      "⚙️ Statistikanızı görmək üçün:\n"
+      "💎 /profile — şəxsi statistikanız\n"
+      "🏆 /rating — top 25 reytinq siyahısı\n"
+      "🎖 /rutbeler — səviyyə və rütbələr haqqında\n"
       "\n"
       "🔐 Yalnız oyun yaradıcısı üçün əmrlər:\n"
       "🚫 /close — Oyuna girişləri bağla\n"
@@ -146,10 +160,34 @@ def rating_leaderboard(update: Update, context: CallbackContext):
                parse_mode=ParseMode.MARKDOWN)
 
 
+@user_locale
+def ranks_handler(update: Update, context: CallbackContext):
+    """Handler for the /rutbeler command - səviyyə/rütbə sistemini izah edir"""
+    lines = ["🎖 *Səviyyə və Rütbələr*\n",
+             "Hər dəfə bir oyunu 1-ci yerdə bitirdikcə (qalib gəldikcə) "
+             "xalınız (qələbə sayınız) 1 artır. Qələbə sayınız artdıqca "
+             "səviyyəniz və rütbəniz avtomatik yüksəlir:\n"]
+
+    for i, (threshold, level, rank_name) in enumerate(LEVELS):
+        if i + 1 < len(LEVELS):
+            next_threshold = LEVELS[i + 1][0]
+            lines.append(f"⭐ Səviyyə {level} — {rank_name}: {threshold}-{next_threshold - 1} qələbə")
+        else:
+            lines.append(f"⭐ Səviyyə {level} — {rank_name}: {threshold}+ qələbə")
+
+    lines.append("\nHamı 1-ci səviyyədən (🔰 Yeni Başlayan) başlayır. "
+                 "Öz statistikanızı /profile, top 25 reytinqi isə /rating "
+                 "əmri ilə görə bilərsiniz.")
+
+    send_async(context.bot, update.message.chat_id, text="\n".join(lines),
+               parse_mode=ParseMode.MARKDOWN)
+
+
 def register():
     dispatcher.add_handler(CommandHandler('help', help_handler))
     dispatcher.add_handler(CommandHandler('yrjrj', source))
     dispatcher.add_handler(CommandHandler('newsdusi', news))
     dispatcher.add_handler(CommandHandler('rating', rating_leaderboard))
     dispatcher.add_handler(CommandHandler('profile', profile_handler))
+    dispatcher.add_handler(CommandHandler('rutbeler', ranks_handler))
     dispatcher.add_handler(CommandHandler('modesdkdk', modes))

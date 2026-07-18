@@ -5,11 +5,8 @@ import logging
 import card as c
 from datetime import datetime
 
-from telegram import Message, Chat
-from telegram.ext import CallbackContext
-from apscheduler.jobstores.base import JobLookupError
+from telegram import Message, Chat, InlineKeyboardButton, InlineKeyboardMarkup
 
-from config import TIME_REMOVAL_AFTER_SKIP, MIN_FAST_TURN_TIME
 from errors import DeckEmptyError, NotEnoughPlayersError
 from internationalization import __, _
 from levels import compute_level, place_label
@@ -19,61 +16,30 @@ from utils import send_async, display_name, game_is_running
 
 logger = logging.getLogger(__name__)
 
-class Countdown(object):
-    player = None
-    job_queue = None
 
-    def __init__(self, player, job_queue):
-        self.player = player
-        self.job_queue = job_queue
-
-
-# TODO do_skip() could get executed in another thread (it can be a job), so it looks like it can't use game.translate?
-def do_skip(bot, player, job_queue=None):
-    game = player.game
+def do_skip(bot, game):
+    """`/skip` - sıradakı (indiki növbədə olan) oyunçunu oyundan çıxarır,
+    yerini (placement) müəyyənləşdirir və növbəni sonrakı oyunçuya keçirir.
+    Yalnız 3 və ya daha çox oyunçu qalanda mümkündür (2 nəfər qalanda oyun
+    bitəcəyi üçün skip qadağandır)."""
     chat = game.chat
     skipped_player = game.current_player
-    next_player = game.current_player.next
 
-    if skipped_player.waiting_time > 0:
-        skipped_player.anti_cheat += 1
-        skipped_player.waiting_time -= TIME_REMOVAL_AFTER_SKIP
-        if (skipped_player.waiting_time < 0):
-            skipped_player.waiting_time = 0
-
-        try:
-            skipped_player.draw()
-        except DeckEmptyError:
-            pass
-
-        n = skipped_player.waiting_time
+    if len(game.players) <= 2:
         send_async(bot, chat.id,
-                   text=__("Bu oyunçunu keçmək üçün vaxt"
-                        "azaldı. {time} saniyə qaldı.\n"
-                        "Növbəti oyunçu: {name}", multi=game.translate)
-                   .format(time=n,
-                           name=display_name(next_player.user))
-        )
-        logger.info("{player} keçildi! "
-                    .format(player=display_name(player.user)))
-        game.turn()
-        if job_queue:
-            start_player_countdown(bot, game, job_queue)
+                   text=_("Oyunda iki nəfər qalığda skip oluna bilməz oyunçu ⛔"))
+        return
 
-    else:
-        ended = process_departure(bot, chat, game, skipped_player.user)
+    ended = process_departure(bot, chat, game, skipped_player.user)
 
-        if not ended:
-            send_async(bot, chat.id,
-                       text=__("{name1} vaxtı bitdi"
-                            "və oyundan kənarlaşdırıldı!\n"
-                            "Növbəti oyuçu: {name2}", multi=game.translate)
-                       .format(name1=display_name(skipped_player.user),
-                               name2=display_name(next_player.user)))
-            logger.info("{player} keçildi! "
-                    .format(player=display_name(player.user)))
-            if job_queue:
-                start_player_countdown(bot, game, job_queue)
+    if not ended and game_is_running(game):
+        nextplayer_message = (
+            __("Növbəti oyunçu: {name}", multi=game.translate)
+            .format(name=display_name(game.current_player.user)))
+        choice = [[InlineKeyboardButton(text=_("Seçiminizi Edin!"), switch_inline_query_current_chat='')]]
+        send_async(bot, chat.id,
+                   text=nextplayer_message,
+                   reply_markup=InlineKeyboardMarkup(choice))
 
 
 
@@ -258,37 +224,3 @@ def do_call_bluff(bot, player):
                                multi=game.translate))
 
     game.turn()
-
-
-def start_player_countdown(bot, game, job_queue):
-    player = game.current_player
-    time = player.waiting_time
-
-    if time < MIN_FAST_TURN_TIME:
-        time = MIN_FAST_TURN_TIME
-
-    if game.mode == 'fast':
-        if game.job:
-            try:
-                game.job.schedule_removal()
-            except JobLookupError:
-                pass
-
-        job = job_queue.run_once(
-            #lambda x,y: do_skip(bot, player),
-            skip_job,
-            time,
-            context=Countdown(player, job_queue)
-        )
-
-        logger.info("Geri sayım başladı oyunçu üçün: {player}. {time} saniyə."
-                    .format(player=display_name(player.user), time=time))
-        player.game.job = job
-
-
-def skip_job(context: CallbackContext):
-    player = context.job.context.player
-    game = player.game
-    if game_is_running(game):
-        job_queue = context.job.context.job_queue
-        do_skip(context.bot, player, job_queue)
