@@ -61,8 +61,9 @@ def do_skip(bot, player, job_queue=None):
             start_player_countdown(bot, game, job_queue)
 
     else:
-        try:
-            gm.leave_game(skipped_player.user, chat)
+        ended = process_departure(bot, chat, game, skipped_player.user)
+
+        if not ended:
             send_async(bot, chat.id,
                        text=__("{name1} vaxtı bitdi"
                             "və oyundan kənarlaşdırıldı!\n"
@@ -73,13 +74,6 @@ def do_skip(bot, player, job_queue=None):
                     .format(player=display_name(player.user)))
             if job_queue:
                 start_player_countdown(bot, game, job_queue)
-
-        except NotEnoughPlayersError:
-            send_async(bot, chat.id,
-                       text=__("{name} vaxtı bitdi və oyundan çıxarıldı!\nOyun bitdi.", multi=game.translate)
-                       .format(name=display_name(skipped_player.user)))
-
-            gm.end_game(chat, skipped_player.user)
 
 
 
@@ -101,6 +95,38 @@ def send_final_standings(bot, chat_id, game):
     send_async(bot, chat_id, text=result_message, parse_mode="Markdown")
 
 
+def process_departure(bot, chat, game, user):
+    """/leave, /kick və skip-lə kənarlaşdırma zamanı ORTAQ yer (placement)
+    izləmə məntiqi. Oyunu tərk edən / kənarlaşdırılan oyunçu sıralamada
+    (finish_order) HƏMİŞƏ sonuncu yerlərdən birinə yazılır. Əgər bu, oyunu
+    tam bitirirsə (yalnız 1 nəfər qalırsa), son oyunçu da əlavə olunur və
+    tam qalibiyyət sıralaması göndərilir.
+
+    Return: True -> oyun tam bitdi (final sıralama göndərildi)
+            False -> oyun davam edir
+    """
+    game.finish_order.append(user)
+
+    try:
+        gm.leave_game(user, chat)
+    except NotEnoughPlayersError:
+        last_player = game.current_player.user
+        game.finish_order.append(last_player)
+
+        send_final_standings(bot, chat.id, game)
+
+        us2 = UserSetting.get(id=last_player.id)
+        if not us2:
+            us2 = UserSetting(id=last_player.id)
+        us2.games_played += 1
+        us2.name = display_name(last_player)
+
+        gm.end_game(chat, user)
+        return True
+
+    return False
+
+
 def do_play_card(bot, player, result_id):
     """Seçilmiş kartı masaya qoyur və ehtiyac olarsa, qrupa oyun vəziyyəti ilə bağlı məlumat göndərir."""
     card = c.from_str(result_id)
@@ -113,8 +139,7 @@ def do_play_card(bot, player, result_id):
     if not us:
         us = UserSetting(id=user.id)
 
-    if us.stats:
-        us.cards_played += 1
+    us.cards_played += 1
 
     if game.choosing_color:
         send_async(bot, chat.id, text=__("Zəhmət olmasa reng seçin", multi=game.translate))
@@ -135,12 +160,11 @@ def do_play_card(bot, player, result_id):
                        text=__("🎉 {name} oyunu {place}-cü yerdə bitirdi!", multi=game.translate)
                        .format(name=user.first_name, place=place))
 
-        if us.stats:
-            us.games_played += 1
-            us.name = display_name(user)
+        us.games_played += 1
+        us.name = display_name(user)
 
-            if game.players_won == 0:
-                us.first_places += 1
+        if game.players_won == 0:
+            us.first_places += 1
 
         game.players_won += 1
 
@@ -155,9 +179,8 @@ def do_play_card(bot, player, result_id):
             us2 = UserSetting.get(id=last_player.id)
             if not us2:
                 us2 = UserSetting(id=last_player.id)
-            if us2.stats:
-                us2.games_played += 1
-                us2.name = display_name(last_player)
+            us2.games_played += 1
+            us2.name = display_name(last_player)
 
             gm.end_game(chat, user)
 

@@ -30,14 +30,15 @@ import card as c
 import settings
 import simple_commands
 import broadcast
-from actions import do_skip, do_play_card, do_draw, do_call_bluff, start_player_countdown
+from actions import (do_skip, do_play_card, do_draw, do_call_bluff,
+                     start_player_countdown, process_departure)
 from config import WAITING_TIME, DEFAULT_GAMEMODE, MIN_PLAYERS, MAX_PLAYERS, LOBBY_TIMEOUT_MINUTES
 from errors import (NoGameInChatError, LobbyClosedError, AlreadyJoinedError,
                     NotEnoughPlayersError, DeckEmptyError)
 from internationalization import _, __, user_locale, game_locales
 from lobby import (get_lobby_keyboard, build_lobby_text, update_lobby_message,
                    send_lobby_message, close_lobby_tracking, get_open_lobby,
-                   check_inactive_lobbies_job)
+                   get_active_game, check_inactive_lobbies_job)
 from results import (add_call_bluff, add_choose_color, add_draw, add_gameinfo,
                      add_no_game, add_not_started, add_other_cards, add_pass,
                      add_card, add_mode_classic, add_mode_fast, add_mode_wild, add_mode_text)
@@ -54,6 +55,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logging.getLogger('apscheduler').setLevel(logging.WARNING)
+
+
+def _group_only_notice(update: Update, context: CallbackContext):
+    """Yalnız qrupda işləyən əmrlər şəxsi mesajda yazılanda göstərilir."""
+    send_async(context.bot, update.message.chat_id,
+               text=_("⚠️ Bu əmr yalnız qrup daxilində işləyir."))
 
 @user_locale
 def notify_me(update: Update, context: CallbackContext):
@@ -76,35 +83,40 @@ def new_game(update: Update, context: CallbackContext):
     chat_id = update.message.chat_id
 
     if update.message.chat.type == 'private':
-        help_handler(update, context)
+        _group_only_notice(update, context)
+        return
 
-    else:
-
-        # 🟢 Artıq açıq qeydiyyat (lobby) varsa, ikinci menyu açmaq əvəzinə
-        # xəbərdarlıq göndər (Domino botundakı eyni məntiq)
-        if get_open_lobby(chat_id) is not None:
+    # 🟢 Artıq aktiv oyun (qeydiyyat VƏ YA gedişat mərhələsində) varsa,
+    # yeni qeydiyyat menyusu açmaq əvəzinə xəbərdarlıq göndər
+    active_game = get_active_game(chat_id)
+    if active_game is not None:
+        if not active_game.started:
             send_async(context.bot, chat_id,
                        text=_("✅ Artıq aktiv qeydiyyat menyusu var. "
-                              "Oyunu bitirmək üçün /stop yazın."))
-            return
+                              "Oyunu sonlandırmaq üçün: /stop"))
+        else:
+            send_async(context.bot, chat_id,
+                       text=_("⚠️ Artıq qrupda aktiv UNO oyunu gedir, hələ bitməyib. "
+                              "Oyunu sonlandırmaq üçün: /stop"))
+        return
 
-        if update.message.chat_id in gm.remind_dict:
-            for user in gm.remind_dict[update.message.chat_id]:
-                send_async(context.bot,
-                           user,
-                           text=_("Yeni oyun başlayır {title}").format(
-                                title=update.message.chat.title))
+    if update.message.chat_id in gm.remind_dict:
+        for user in gm.remind_dict[update.message.chat_id]:
+            send_async(context.bot,
+                       user,
+                       text=_("Yeni oyun başlayır {title}").format(
+                            title=update.message.chat.title))
 
-            del gm.remind_dict[update.message.chat_id]
+        del gm.remind_dict[update.message.chat_id]
 
-        game = gm.new_game(update.message.chat)
-        game.starter = update.message.from_user
-        game.owner = set()
-        game.owner.add(update.message.from_user.id)
-        game.mode = DEFAULT_GAMEMODE
+    game = gm.new_game(update.message.chat)
+    game.starter = update.message.from_user
+    game.owner = set()
+    game.owner.add(update.message.from_user.id)
+    game.mode = DEFAULT_GAMEMODE
 
-        # 🟢 Domino botundakı kimi interaktiv qeydiyyat menyusu
-        send_lobby_message(context.bot, chat_id, game)
+    # 🟢 Domino botundakı kimi interaktiv qeydiyyat menyusu
+    send_lobby_message(context.bot, chat_id, game)
 
 
 @user_locale
@@ -115,7 +127,7 @@ def kill_game(update: Update, context: CallbackContext):
     games = gm.chatid_games.get(chat.id)
 
     if update.message.chat.type == 'private':
-        help_handler(update, context)
+        _group_only_notice(update, context)
         return
 
     if not games:
@@ -134,7 +146,9 @@ def kill_game(update: Update, context: CallbackContext):
                 except Exception:
                     pass
             gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
+            send_async(context.bot, chat.id,
+                       text=_("❌ Aktiv uno oyunu sonlandırıldı. "
+                              "Yeni oyunu başlatmaq üçün /uno yazın."))
 
         except NoGameInChatError:
             send_async(context.bot, chat.id,
@@ -154,7 +168,7 @@ def join_game(update: Update, context: CallbackContext):
     chat = update.message.chat
 
     if update.message.chat.type == 'private':
-        help_handler(update, context)
+        _group_only_notice(update, context)
         return
 
     lobby_game = get_open_lobby(chat.id)
@@ -179,7 +193,7 @@ def join_game(update: Update, context: CallbackContext):
 
     except AlreadyJoinedError:
         send_async(context.bot, chat.id,
-                   text=_("Siz artıq oyuna qoşulmusunuz. Oyunu bu əmr ilə başladın: /start"),
+                   text=_("Sən artıq oyuna qoşulmusan ✅"),
                    reply_to_message_id=update.message.message_id)
 
     except DeckEmptyError:
@@ -190,8 +204,8 @@ def join_game(update: Update, context: CallbackContext):
 
     else:
         send_async(context.bot, chat.id,
-                   text=_("Oyuna Qoşuldu"),
-                   reply_to_message_id=update.message.message_id)
+                   text=_("✅ Oyunçu {name} oyuna qoşuldu!")
+                   .format(name=display_name(update.message.from_user)))
         refreshed_lobby = get_open_lobby(chat.id)
         if refreshed_lobby is not None:
             update_lobby_message(context.bot, chat.id, refreshed_lobby)
@@ -203,6 +217,10 @@ def leave_game(update: Update, context: CallbackContext):
     chat = update.message.chat
     user = update.message.from_user
 
+    if update.message.chat.type == 'private':
+        _group_only_notice(update, context)
+        return
+
     player = gm.player_for_user_in_chat(user, chat)
 
     if player is None:
@@ -211,32 +229,41 @@ def leave_game(update: Update, context: CallbackContext):
         return
 
     game = player.game
-    user = update.message.from_user
 
+    if not game.started:
+        # Oyun hələ başlamayıb (lobby mərhələsi) - yer (placement) izləməsi lazım deyil
+        try:
+            gm.leave_game(user, chat)
+        except NoGameInChatError:
+            send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
+                       reply_to_message_id=update.message.message_id)
+            return
+
+        send_async(context.bot, chat.id,
+                   text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl .",
+                           multi=game.translate).format(
+                       name=display_name(user)),
+                   reply_to_message_id=update.message.message_id)
+        refreshed_lobby = get_open_lobby(chat.id)
+        if refreshed_lobby is not None:
+            update_lobby_message(context.bot, chat.id, refreshed_lobby)
+        return
+
+    # 🟢 Oyun artıq gedir - tərk edən oyunçu sıralamada sonuncu yerlərdən
+    # birinə yazılır (domino botundakı kimi)
     try:
-        gm.leave_game(user, chat)
-
+        ended = process_departure(context.bot, chat, game, user)
     except NoGameInChatError:
         send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
                    reply_to_message_id=update.message.message_id)
+        return
 
-    except NotEnoughPlayersError:
-        gm.end_game(chat, user)
-        send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
-
-    else:
-        if game.started:
-            send_async(context.bot, chat.id,
-                       text=__("Tamam. Növbəti oyunçu: {name}",
-                               multi=game.translate).format(
-                           name=display_name(game.current_player.user)),
-                       reply_to_message_id=update.message.message_id)
-        else:
-            send_async(context.bot, chat.id,
-                       text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl .",
-                               multi=game.translate).format(
-                           name=display_name(user)),
-                       reply_to_message_id=update.message.message_id)
+    if not ended:
+        send_async(context.bot, chat.id,
+                   text=__("Tamam. Növbəti oyunçu: {name}",
+                           multi=game.translate).format(
+                       name=display_name(game.current_player.user)),
+                   reply_to_message_id=update.message.message_id)
 
 
 @user_locale
@@ -244,7 +271,7 @@ def kick_player(update: Update, context: CallbackContext):
     """Handler for the /kick command"""
 
     if update.message.chat.type == 'private':
-        help_handler(update, context)
+        _group_only_notice(update, context)
         return
 
     chat = update.message.chat
@@ -263,7 +290,7 @@ def kick_player(update: Update, context: CallbackContext):
     if not game.started:
         send_async(context.bot, chat.id,
                    text=_("Oyun hələki başlamayıb. "
-                          "Oyuna qoşulmaq üçün /join və oyunu başladmaq üçün /start"),
+                          "Oyuna qoşulmaq üçün /join və qeydiyyat menyusundan oyunu başladın."),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -273,18 +300,11 @@ def kick_player(update: Update, context: CallbackContext):
             kicked = update.message.reply_to_message.from_user
 
             try:
-                gm.leave_game(kicked, chat)
+                ended = process_departure(context.bot, chat, game, kicked)
 
             except NoGameInChatError:
                 send_async(context.bot, chat.id, text=_("Oyunçu {name} tapılmadı indiki oyunda.".format(name=display_name(kicked))),
                                 reply_to_message_id=update.message.message_id)
-                return
-
-            except NotEnoughPlayersError:
-                gm.end_game(chat, user)
-                send_async(context.bot, chat.id,
-                                text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
-                send_async(context.bot, chat.id, text=__("Oyun Bitdi!", multi=game.translate))
                 return
 
             send_async(context.bot, chat.id,
@@ -296,11 +316,12 @@ def kick_player(update: Update, context: CallbackContext):
                 reply_to_message_id=update.message.message_id)
             return
 
-        send_async(context.bot, chat.id,
-                   text=__("Tamam. Növbəti oyunçu: {name}",
-                           multi=game.translate).format(
-                       name=display_name(game.current_player.user)),
-                   reply_to_message_id=update.message.message_id)
+        if not ended:
+            send_async(context.bot, chat.id,
+                       text=__("Tamam. Növbəti oyunçu: {name}",
+                               multi=game.translate).format(
+                           name=display_name(game.current_player.user)),
+                       reply_to_message_id=update.message.message_id)
 
     else:
         send_async(context.bot, chat.id,
@@ -309,6 +330,7 @@ def kick_player(update: Update, context: CallbackContext):
                   reply_to_message_id=update.message.message_id)
 
 
+@user_locale
 def lobby_join_callback(update: Update, context: CallbackContext):
     """Handler for the 'Oyuna Qoşul 🙋‍♂️' lobby button"""
     query = update.callback_query
@@ -331,7 +353,7 @@ def lobby_join_callback(update: Update, context: CallbackContext):
         query.answer(_("Oyuna qeydiyyat bağlanıb"), show_alert=True)
         return
     except AlreadyJoinedError:
-        query.answer(_("Siz artıq oyuna qoşulmusunuz."), show_alert=False)
+        query.answer(_("Sən artıq oyuna qoşulmusan ✅"), show_alert=True)
         return
     except DeckEmptyError:
         query.answer(_("Əlinizdə kifayət qədər kart qalmayıb yeni oyunçuların qoşulması üçün."),
@@ -344,8 +366,11 @@ def lobby_join_callback(update: Update, context: CallbackContext):
     game.last_lobby_activity = datetime.now()
     update_lobby_message(context.bot, chat.id, game)
     query.answer(_("Oyuna qoşuldunuz!"), show_alert=False)
+    send_async(context.bot, chat.id,
+               text=_("✅ Oyunçu {name} oyuna qoşuldu!").format(name=display_name(user)))
 
 
+@user_locale
 def lobby_start_callback(update: Update, context: CallbackContext):
     """Handler for the 'Oyunu Başlat ▶️' lobby button"""
     query = update.callback_query
@@ -409,18 +434,26 @@ def status_update(update: Update, context: CallbackContext):
 
     if update.message.left_chat_member:
         user = update.message.left_chat_member
+        player = gm.player_for_user_in_chat(user, chat)
+
+        if player is None:
+            return
+
+        game = player.game
+
+        if not game.started:
+            try:
+                gm.leave_game(user, chat)
+            except NoGameInChatError:
+                pass
+            return
 
         try:
-            gm.leave_game(user, chat)
-            game = gm.player_for_user_in_chat(user, chat).game
-
+            ended = process_departure(context.bot, chat, game, user)
         except NoGameInChatError:
-            pass
-        except NotEnoughPlayersError:
-            gm.end_game(chat, user)
-            send_async(context.bot, chat.id, text=__("Oyun Bitdi!",
-                                             multi=game.translate))
-        else:
+            return
+
+        if not ended:
             send_async(context.bot, chat.id, text=__("{name} kənarlaşdırılır oyundan",
                                              multi=game.translate)
                        .format(name=display_name(user)))
@@ -466,54 +499,11 @@ def perform_game_start(bot, job_queue, chat, game):
     start_player_countdown(bot, game, job_queue)
 
 
-@game_locales
-@user_locale
 def start_game(update: Update, context: CallbackContext):
-    """Handler for the /start command"""
-
-    if update.message.chat.type != 'private':
-        chat = update.message.chat
-
-        try:
-            game = gm.chatid_games[chat.id][-1]
-        except (KeyError, IndexError):
-            send_async(context.bot, chat.id,
-                       text=_("Məni Qrupunuza əlavə etdiyiniz üçün təşəkkürlər. Yeni Oyun yaratmaq üçün /new yazın və qrupda vaxtınızı dostlarınız ilə marağlı keçirin "))
-            return
-
-        if game.started:
-            send_async(context.bot, chat.id, text=_("Oyun artıq başlayıb"))
-
-        elif len(game.players) < MIN_PLAYERS:
-            send_async(context.bot, chat.id,
-                       text=__("Ən azından {minplayers} oyunçu qoşulmalıdır oyuna: /join ,"
-                              "sizin oyuna start etməyiniz üçün").format(minplayers=MIN_PLAYERS))
-
-        else:
-            # Starting a game
-            perform_game_start(context.bot, context.job_queue, chat, game)
-
-    elif len(context.args) and context.args[0] == 'select':
-        players = gm.userid_players[update.message.from_user.id]
-
-        groups = list()
-        for player in players:
-            title = player.game.chat.title
-
-            if player == gm.userid_current[update.message.from_user.id]:
-                title = '- %s -' % player.game.chat.title
-
-            groups.append(
-                [InlineKeyboardButton(text=title,
-                                      callback_data=str(player.game.chat.id))]
-            )
-
-        send_async(context.bot, update.message.chat_id,
-                   text=_('Zəhmət olmasa oyunu oynamaq istədiyiniz qrupu seçin.'),
-                   reply_markup=InlineKeyboardMarkup(groups))
-
-    else:
-        help_handler(update, context)
+    """Handler for the /start command - artıq sadəcə /help mesajını göstərir.
+    Oyunu başlatmaq üçün YALNIZ qeydiyyat menyusundakı 'Oyunu Başlat ▶️'
+    düyməsi istifadə olunur."""
+    help_handler(update, context)
 
 
 @user_locale
@@ -521,6 +511,11 @@ def close_game(update: Update, context: CallbackContext):
     """Handler for the /close command"""
     chat = update.message.chat
     user = update.message.from_user
+
+    if update.message.chat.type == 'private':
+        _group_only_notice(update, context)
+        return
+
     games = gm.chatid_games.get(chat.id)
 
     if not games:
@@ -549,6 +544,11 @@ def open_game(update: Update, context: CallbackContext):
     """Handler for the /open command"""
     chat = update.message.chat
     user = update.message.from_user
+
+    if update.message.chat.type == 'private':
+        _group_only_notice(update, context)
+        return
+
     games = gm.chatid_games.get(chat.id)
 
     if not games:
@@ -633,6 +633,10 @@ def skip_player(update: Update, context: CallbackContext):
     """Handler for the /skip command"""
     chat = update.message.chat
     user = update.message.from_user
+
+    if update.message.chat.type == 'private':
+        _group_only_notice(update, context)
+        return
 
     player = gm.player_for_user_in_chat(user, chat)
     if not player:
@@ -818,7 +822,7 @@ dispatcher.add_handler(ChosenInlineResultHandler(process_result, pass_job_queue=
 dispatcher.add_handler(CallbackQueryHandler(lobby_join_callback, pattern='^uno_lobby_join$'))
 dispatcher.add_handler(CallbackQueryHandler(lobby_start_callback, pattern='^uno_lobby_start$'))
 dispatcher.add_handler(CallbackQueryHandler(select_game))
-dispatcher.add_handler(CommandHandler('start', start_game, pass_args=True, pass_job_queue=True))
+dispatcher.add_handler(CommandHandler('start', start_game))
 dispatcher.add_handler(CommandHandler(['new', 'uno'], new_game))
 dispatcher.add_handler(CommandHandler('stop', kill_game))
 dispatcher.add_handler(CommandHandler('join', join_game))

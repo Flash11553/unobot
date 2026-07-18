@@ -92,10 +92,9 @@ def profile_handler(update: Update, context: CallbackContext):
     """Handler for the /profile command - şəxsi statistika kartı"""
     user = update.message.from_user
     us = UserSetting.get(id=user.id)
-    if not us or not us.stats:
+    if not us or us.games_played == 0:
         send_async(context.bot, update.message.chat_id,
-                   text=_("Sizin Statistikanız hələ mövcud deyil. Statistikanı "
-                          "aktivləşdirmək üçün /settings yazın və bir oyun oynayın."))
+                   text=_("Siz hələ heç bir oyun oynamamısınız. /uno yazaraq oyun başladın!"))
         return
 
     level, rank_name = compute_level(us.first_places)
@@ -120,7 +119,7 @@ def rating_leaderboard(update: Update, context: CallbackContext):
         return
 
     top = list(
-        users_collection.find({"stats": True, "first_places": {"$gt": 0}})
+        users_collection.find({"first_places": {"$gt": 0}})
         .sort("first_places", -1)
         .limit(25)
     )

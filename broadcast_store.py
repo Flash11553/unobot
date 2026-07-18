@@ -3,6 +3,11 @@
 #
 # /broadcast üçün qrup və şəxsi istifadəçi siyahısı. Domino botundakı EYNİ
 # məntiq: bir dəfə yazılan qeyd HEÇ VAXT silinmir (bot restart olsa belə).
+#
+# QEYD: sənədlərdə HƏM "_id" HƏM DƏ açıq "chat_id" / "user_id" sahəsi
+# saxlanılır (Mongo kolleksiyasında əvvəldən "chat_id"/"user_id" üzərində
+# unique index ola bilər - sahəni boş buraxmaq "duplicate key: null" xətası
+# yaradırdı, indi düzəldildi).
 
 import logging
 
@@ -19,7 +24,9 @@ def add_served_chat(chat_id):
         return
     try:
         chats_collection.update_one(
-            {"_id": chat_id}, {"$setOnInsert": {"_id": chat_id}}, upsert=True
+            {"chat_id": chat_id},
+            {"$setOnInsert": {"chat_id": chat_id}},
+            upsert=True,
         )
     except Exception as e:
         logger.error(f"Qrup yaddaşa yazılarkən xəta: {e}")
@@ -36,7 +43,9 @@ def add_served_user(user_id):
         return
     try:
         bc_users_collection.update_one(
-            {"_id": user_id}, {"$setOnInsert": {"_id": user_id}}, upsert=True
+            {"user_id": user_id},
+            {"$setOnInsert": {"user_id": user_id}},
+            upsert=True,
         )
     except Exception as e:
         logger.error(f"İstifadəçi yaddaşa yazılarkən xəta: {e}")

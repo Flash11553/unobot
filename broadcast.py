@@ -79,7 +79,7 @@ def broadcast_command(update: Update, context: CallbackContext):
 
     sent_chats, failed_chats = 0, 0
     for chat in get_served_chats():
-        chat_id = chat["_id"]
+        chat_id = chat["chat_id"]
         try:
             bot.forward_message(chat_id, source_chat_id, source_message_id)
             sent_chats += 1
@@ -101,7 +101,7 @@ def broadcast_command(update: Update, context: CallbackContext):
 
     sent_users, failed_users = 0, 0
     for u in get_served_users():
-        uid = u["_id"]
+        uid = u["user_id"]
         try:
             bot.forward_message(uid, source_chat_id, source_message_id)
             sent_users += 1

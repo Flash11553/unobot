@@ -96,6 +96,14 @@ def get_open_lobby(chat_id):
     return None
 
 
+def get_active_game(chat_id):
+    """Bu qrupda HƏR HANSI aktiv oyun (lobby VƏ YA artıq başlamış) varsa qaytarır."""
+    games = gm.chatid_games.get(chat_id)
+    if not games:
+        return None
+    return games[-1]
+
+
 def check_inactive_lobbies_job(context: CallbackContext):
     """Job queue tərəfindən mütəmadi çağırılır (bax: bot.py).
     5 dəqiqə ərzində başlamayan lobby-ləri avtomatik bağlayır və
