@@ -52,6 +52,9 @@ class Game(object):
         self.lobby_message_id = None
         self.last_lobby_activity = datetime.now()
 
+        # 🟢 Oyunun son hərəkət vaxtı (5 dəqiqə hərəkətsizlik yoxlaması üçün)
+        self.last_activity = datetime.now()
+
         # 🟢 Oyunçuların bitirmə sırası (1-ci, 2-ci, 3-cü ... üçün)
         self.finish_order = []
 
@@ -78,6 +81,7 @@ class Game(object):
 
         self._first_card_()
         self.started = True
+        self.last_activity = datetime.now()
 
     def set_mode(self, mode):
         self.mode = mode
@@ -93,6 +97,7 @@ class Game(object):
         self.current_player.drew = False
         self.current_player.turn_started = datetime.now()
         self.choosing_color = False
+        self.last_activity = datetime.now()
 
     def _first_card_(self):
         # In case that the player did not select a game mode

@@ -14,6 +14,7 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import CallbackContext
 
 from config import MIN_PLAYERS, MAX_PLAYERS, LOBBY_TIMEOUT_MINUTES
+from errors import NoGameInChatError
 from shared_vars import gm
 from user_setting import UserSetting
 from levels import compute_level
@@ -104,52 +105,93 @@ def get_active_game(chat_id):
     return games[-1]
 
 
+def force_end_game(chat, game):
+    """Oyunu MƏCBURİ bitirir - gm.end_game-in 'user mütləq oyunçu olmalıdır'
+    asılılığından yan keçir (məs. admin lobby-yə özü qoşulmayıbsa, və ya
+    hərəkətsizlik/timeout səbəbindən avtomatik bağlananda)."""
+    if game.players:
+        try:
+            gm.end_game(chat, game.players[0].user)
+            return
+        except NoGameInChatError:
+            pass
+
+    games_list = gm.chatid_games.get(chat.id)
+    if games_list and game in games_list:
+        games_list.remove(game)
+        if not games_list:
+            del gm.chatid_games[chat.id]
+
+
 def check_inactive_lobbies_job(context: CallbackContext):
     """Job queue tərəfindən mütəmadi çağırılır (bax: bot.py).
-    5 dəqiqə ərzində başlamayan lobby-ləri avtomatik bağlayır və
-    xəbərdarlıq göndərir (Domino botundakı eyni məntiq)."""
+    - 5 dəqiqə ərzində başlamayan lobby-ləri avtomatik bağlayır
+    - HƏMÇİNİN 5 dəqiqə ərzində heç bir hərəkət (kart oynama, sıra keçmə)
+      olmayan artıq BAŞLAMIŞ oyunları da avtomatik sonlandırır"""
     bot = context.bot
     now = datetime.now()
     threshold = now - timedelta(minutes=LOBBY_TIMEOUT_MINUTES)
 
     for chat_id, games in list(gm.chatid_games.items()):
         for game in list(games):
-            if game.started:
-                continue
 
-            last_activity = game.last_lobby_activity
-            if not last_activity or last_activity >= threshold:
-                continue
+            if not game.started:
+                # ---- Qeydiyyat (lobby) mərhələsi hərəkətsizdirsə ----
+                last_activity = game.last_lobby_activity
+                if not last_activity or last_activity >= threshold:
+                    continue
 
-            players_count = len(game.players)
+                players_count = len(game.players)
 
-            try:
-                if game.lobby_message_id is not None:
-                    try:
-                        bot.delete_message(chat_id, game.lobby_message_id)
-                    except Exception:
-                        pass
+                try:
+                    if game.lobby_message_id is not None:
+                        try:
+                            bot.delete_message(chat_id, game.lobby_message_id)
+                        except Exception:
+                            pass
 
-                games.remove(game)
-                if not games:
-                    del gm.chatid_games[chat_id]
+                    games.remove(game)
+                    if not games:
+                        del gm.chatid_games[chat_id]
 
-                if players_count < MIN_PLAYERS:
-                    text = (
-                        f"⏳ **Oyun Dayandırıldı**\n"
-                        f"Qeydiyyat başlayandan **{LOBBY_TIMEOUT_MINUTES} dəqiqə** keçdi, "
-                        f"lakin ən az {MIN_PLAYERS} oyunçu qoşulmadı. "
-                        f"Yeni oyun üçün /new yazın ✅"
+                    if players_count < MIN_PLAYERS:
+                        text = (
+                            f"⏳ **Oyun Dayandırıldı**\n"
+                            f"Qeydiyyat başlayandan **{LOBBY_TIMEOUT_MINUTES} dəqiqə** keçdi, "
+                            f"lakin ən az {MIN_PLAYERS} oyunçu qoşulmadı. "
+                            f"Yeni oyun üçün /uno yazın ✅"
+                        )
+                    else:
+                        text = (
+                            f"⏳ **Oyun Dayandırıldı**\n"
+                            f"Qeydiyyat başlayandan **{LOBBY_TIMEOUT_MINUTES} dəqiqə** keçdi. "
+                            f"Kifayət qədər oyunçu olsa da, oyun başladılmadı. "
+                            f"Yeni oyun üçün /uno yazın ✅"
+                        )
+
+                    bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+                    logger.info(f"Lobby timeout ilə bağlandı. Chat ID: {chat_id}")
+                except Exception as e:
+                    logger.error(f"Lobby timeout bildirişi göndərilərkən xəta: {e}")
+
+            else:
+                # ---- Artıq başlamış, amma hərəkətsiz qalmış oyun ----
+                last_activity = getattr(game, "last_activity", None)
+                if not last_activity or last_activity >= threshold:
+                    continue
+
+                try:
+                    force_end_game(game.chat, game)
+                    bot.send_message(
+                        chat_id=chat_id,
+                        text=(
+                            f"⏳ **Oyun Dayandırıldı**\n"
+                            f"Oyunda **{LOBBY_TIMEOUT_MINUTES} dəqiqədir** heç bir hərəkət "
+                            f"olmadığı üçün avtomatik sonlandırıldı. "
+                            f"Yeni oyun üçün /uno yazın ✅"
+                        ),
+                        parse_mode="Markdown",
                     )
-                else:
-                    text = (
-                        f"⏳ **Oyun Dayandırıldı**\n"
-                        f"Qeydiyyat başlayandan **{LOBBY_TIMEOUT_MINUTES} dəqiqə** keçdi. "
-                        f"Kifayət qədər oyunçu olsa da, oyun başladılmadı. "
-                        f"Yeni oyun üçün /new yazın ✅"
-                    )
-
-                bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
-                logger.info(f"Lobby timeout ilə bağlandı. Chat ID: {chat_id}")
-            except Exception as e:
-                logger.error(f"Lobby timeout bildirişi göndərilərkən xəta: {e}")
+                    logger.info(f"Hərəkətsizlik səbəbindən oyun sonlandırıldı. Chat ID: {chat_id}")
+                except Exception as e:
+                    logger.error(f"Hərəkətsiz oyun sonlandırılarkən xəta: {e}")

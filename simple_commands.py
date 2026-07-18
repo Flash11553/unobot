@@ -36,8 +36,7 @@ def help_handler(update: Update, context: CallbackContext):
       "🔐 Yalnız oyun yaradıcısı üçün əmrlər:\n"
       "🚫 /close — Oyuna girişləri bağla\n"
       "✅ /open — Oyuna girişləri aç\n"
-      "🛑 /stop — Oyunu dayandır\n"
-      "👢 /kick — Oyunçunu çıxarmaq üçün onun mesajına cavab ver\n")
+      "🛑 /stop — Oyunu dayandır\n")
 
     def _send():  
       update.message.chat.send_message(  
@@ -92,19 +91,23 @@ def profile_handler(update: Update, context: CallbackContext):
     """Handler for the /profile command - şəxsi statistika kartı"""
     user = update.message.from_user
     us = UserSetting.get(id=user.id)
-    if not us or us.games_played == 0:
+
+    games_played = int(getattr(us, "games_played", 0) or 0) if us else 0
+    first_places = int(getattr(us, "first_places", 0) or 0) if us else 0
+
+    if games_played == 0:
         send_async(context.bot, update.message.chat_id,
                    text=_("Siz hələ heç bir oyun oynamamısınız. /uno yazaraq oyun başladın!"))
         return
 
-    level, rank_name = compute_level(us.first_places)
+    level, rank_name = compute_level(first_places)
 
     profile_text = (
-        "👤 Oyunçu\n\n"
+        f"👤 {user.first_name}\n\n"
         f"🏅 Rütbə: {rank_name}\n"
         f"⭐ Səviyyə: {level}\n\n"
-        f"🎮 Oyun: {us.games_played}\n"
-        f"🏆 Qələbə: {us.first_places}\n"
+        f"🎮 Oyun: {games_played}\n"
+        f"🏆 Qələbə: {first_places}\n"
     )
 
     send_async(context.bot, update.message.chat_id, text=profile_text)
@@ -118,11 +121,14 @@ def rating_leaderboard(update: Update, context: CallbackContext):
                    text=_("Reytinq siyahısı hazırda əlçatan deyil."))
         return
 
-    top = list(
-        users_collection.find({"first_places": {"$gt": 0}})
-        .sort("first_places", -1)
-        .limit(25)
-    )
+    try:
+        docs = list(users_collection.find({}).sort("first_places", -1).limit(100))
+    except Exception:
+        send_async(context.bot, update.message.chat_id,
+                   text=_("Reytinq siyahısı hazırda əlçatan deyil."))
+        return
+
+    top = [d for d in docs if int(d.get("first_places", 0) or 0) > 0][:25]
 
     if not top:
         send_async(context.bot, update.message.chat_id,
@@ -132,10 +138,8 @@ def rating_leaderboard(update: Update, context: CallbackContext):
     rating_message = "👑 *UNO Reytinq Siyahısı:*\n\n"
     for i, doc in enumerate(top, start=1):
         name = escape_markdown_symbols(doc.get("name") or "Anonim")
-        wins = doc.get("first_places", 0)
-        level, rank_name = doc.get("level"), doc.get("rank_name")
-        if level is None or rank_name is None:
-            level, rank_name = compute_level(wins)
+        wins = int(doc.get("first_places", 0) or 0)
+        level, rank_name = compute_level(wins)
         rating_message += f"{i}. {name} — {rank_name} ⭐{level} — *{wins} qələbə*\n"
 
     send_async(context.bot, update.message.chat_id, text=rating_message,

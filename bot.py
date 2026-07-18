@@ -38,7 +38,7 @@ from errors import (NoGameInChatError, LobbyClosedError, AlreadyJoinedError,
 from internationalization import _, __, user_locale, game_locales
 from lobby import (get_lobby_keyboard, build_lobby_text, update_lobby_message,
                    send_lobby_message, close_lobby_tracking, get_open_lobby,
-                   get_active_game, check_inactive_lobbies_job)
+                   get_active_game, force_end_game, check_inactive_lobbies_job)
 from results import (add_call_bluff, add_choose_color, add_draw, add_gameinfo,
                      add_no_game, add_not_started, add_other_cards, add_pass,
                      add_card, add_mode_classic, add_mode_fast, add_mode_wild, add_mode_text)
@@ -67,9 +67,7 @@ def notify_me(update: Update, context: CallbackContext):
     """Handler for /notify_me command, pm people for next game"""
     chat_id = update.message.chat_id
     if update.message.chat.type == 'private':
-        send_async(bot,
-                   chat_id,
-                   text=_("Yeni oyun başladıqda xəbərdar olmaq üçün bu əmri bir qrupda göndərin."))
+        _group_only_notice(update, context)
     else:
         try:
             gm.remind_dict[chat_id].add(update.message.from_user.id)
@@ -139,22 +137,17 @@ def kill_game(update: Update, context: CallbackContext):
 
     if user_is_creator_or_admin(user, game, context.bot, chat):
 
-        try:
-            if game.lobby_message_id is not None:
-                try:
-                    context.bot.delete_message(chat.id, game.lobby_message_id)
-                except Exception:
-                    pass
-            gm.end_game(chat, user)
-            send_async(context.bot, chat.id,
-                       text=_("❌ Aktiv uno oyunu sonlandırıldı. "
-                              "Yeni oyunu başlatmaq üçün /uno yazın."))
+        if game.lobby_message_id is not None:
+            try:
+                context.bot.delete_message(chat.id, game.lobby_message_id)
+            except Exception:
+                pass
 
-        except NoGameInChatError:
-            send_async(context.bot, chat.id,
-                       text=_("Oyun hələ ki başlamayıb."
-                              "Oyuna qoşulmaq üçün /join və oyuna start etmək üçün /start"),
-                       reply_to_message_id=update.message.message_id)
+        force_end_game(chat, game)
+
+        send_async(context.bot, chat.id,
+                   text=_("❌ Aktiv uno oyunu sonlandırıldı. "
+                          "Yeni oyunu başlatmaq üçün /uno yazın."))
 
     else:
         send_async(context.bot, chat.id,
@@ -264,70 +257,6 @@ def leave_game(update: Update, context: CallbackContext):
                            multi=game.translate).format(
                        name=display_name(game.current_player.user)),
                    reply_to_message_id=update.message.message_id)
-
-
-@user_locale
-def kick_player(update: Update, context: CallbackContext):
-    """Handler for the /kick command"""
-
-    if update.message.chat.type == 'private':
-        _group_only_notice(update, context)
-        return
-
-    chat = update.message.chat
-    user = update.message.from_user
-
-    try:
-        game = gm.chatid_games[chat.id][-1]
-
-    except (KeyError, IndexError):
-            send_async(context.bot, chat.id,
-                   text=_("Hal-hazırda heç bir oyun davam etmir."
-                          "Yeni oyun yaradın /new ilə"),
-                   reply_to_message_id=update.message.message_id)
-            return
-
-    if not game.started:
-        send_async(context.bot, chat.id,
-                   text=_("Oyun hələki başlamayıb. "
-                          "Oyuna qoşulmaq üçün /join və qeydiyyat menyusundan oyunu başladın."),
-                   reply_to_message_id=update.message.message_id)
-        return
-
-    if user_is_creator_or_admin(user, game, context.bot, chat):
-
-        if update.message.reply_to_message:
-            kicked = update.message.reply_to_message.from_user
-
-            try:
-                ended = process_departure(context.bot, chat, game, kicked)
-
-            except NoGameInChatError:
-                send_async(context.bot, chat.id, text=_("Oyunçu {name} tapılmadı indiki oyunda.".format(name=display_name(kicked))),
-                                reply_to_message_id=update.message.message_id)
-                return
-
-            send_async(context.bot, chat.id,
-                            text=_("{0} atıldı tərəfindən {1}".format(display_name(kicked), display_name(user))))
-
-        else:
-            send_async(context.bot, chat.id,
-                text=_("Oyundan atmaq istədiyiniz şəxsə cavab verin və /kick yazın."),
-                reply_to_message_id=update.message.message_id)
-            return
-
-        if not ended:
-            send_async(context.bot, chat.id,
-                       text=__("Tamam. Növbəti oyunçu: {name}",
-                               multi=game.translate).format(
-                           name=display_name(game.current_player.user)),
-                       reply_to_message_id=update.message.message_id)
-
-    else:
-        send_async(context.bot, chat.id,
-                  text=_("Ancaq Oyunu başladan ({name}) bu əmri icra edə bilər.")
-                  .format(name=game.starter.first_name),
-                  reply_to_message_id=update.message.message_id)
 
 
 @user_locale
@@ -630,7 +559,8 @@ def disable_translations(update: Update, context: CallbackContext):
 @game_locales
 @user_locale
 def skip_player(update: Update, context: CallbackContext):
-    """Handler for the /skip command"""
+    """Handler for the /skip command - dərhal növbəti oyunçuya keçir,
+    gözləmə vaxtı yoxlanılmır."""
     chat = update.message.chat
     user = update.message.from_user
 
@@ -645,24 +575,13 @@ def skip_player(update: Update, context: CallbackContext):
         return
 
     game = player.game
-    skipped_player = game.current_player
 
-    started = skipped_player.turn_started
-    now = datetime.now()
-    delta = (now - started).seconds
-
-    # You can't skip if the current player still has time left
-    # You can skip yourself even if you have time left (you'll still draw)
-    if delta < skipped_player.waiting_time and player != skipped_player:
-        n = skipped_player.waiting_time - delta
+    if not game.started:
         send_async(context.bot, chat.id,
-                   text=_("Zəhmət olmasa {time} saniyə gözləyin",
-                          "Zəhmət olmasa {time} saniyə gözləyin",
-                          n)
-                   .format(time=n),
-                   reply_to_message_id=update.message.message_id)
-    else:
-        do_skip(context.bot, player)
+                   text=_("Oyun hələ başlamayıb."))
+        return
+
+    do_skip(context.bot, game.current_player, context.job_queue)
 
 
 @game_locales
@@ -827,7 +746,6 @@ dispatcher.add_handler(CommandHandler(['new', 'uno'], new_game))
 dispatcher.add_handler(CommandHandler('stop', kill_game))
 dispatcher.add_handler(CommandHandler('join', join_game))
 dispatcher.add_handler(CommandHandler('leave', leave_game))
-dispatcher.add_handler(CommandHandler('kick', kick_player))
 dispatcher.add_handler(CommandHandler('open', open_game))
 dispatcher.add_handler(CommandHandler('close', close_game))
 dispatcher.add_handler(CommandHandler('enablelrme_translationss',

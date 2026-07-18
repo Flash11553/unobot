@@ -96,33 +96,55 @@ def send_final_standings(bot, chat_id, game):
 
 
 def process_departure(bot, chat, game, user):
-    """/leave, /kick və skip-lə kənarlaşdırma zamanı ORTAQ yer (placement)
-    izləmə məntiqi. Oyunu tərk edən / kənarlaşdırılan oyunçu sıralamada
-    (finish_order) HƏMİŞƏ sonuncu yerlərdən birinə yazılır. Əgər bu, oyunu
-    tam bitirirsə (yalnız 1 nəfər qalırsa), son oyunçu da əlavə olunur və
-    tam qalibiyyət sıralaması göndərilir.
+    """/leave və skip-lə kənarlaşdırma zamanı ORTAQ yer (placement) izləmə
+    məntiqi. Oyunu tərk edən oyunçu HEÇ VAXT xal (qələbə) qazanmır və
+    sıralamada HƏMİŞƏ ən pis yerlərdən birinə yazılır.
+
+    Əgər bu tərk etmə oyunu TAM bitirirsə (yalnız 1 nəfər qalırsa), sağ
+    qalan sonuncu oyunçu - tərk edəndən HƏMİŞƏ daha yaxşı yerdə olmaqla -
+    sıralamaya əlavə olunur və əgər hələ heç kim (players_won == 0) oyunu
+    bitirməyibsə, bu sağ qalan oyunçu 1-ci sayılır və +1 xal qazanır.
 
     Return: True -> oyun tam bitdi (final sıralama göndərildi)
             False -> oyun davam edir
     """
-    game.finish_order.append(user)
-
     try:
         gm.leave_game(user, chat)
     except NotEnoughPlayersError:
         last_player = game.current_player.user
+
+        # Sağ qalan oyunçu, tərk edəndən HƏMİŞƏ daha yaxşı yerdə olur
         game.finish_order.append(last_player)
+        game.finish_order.append(user)
 
         send_final_standings(bot, chat.id, game)
 
-        us2 = UserSetting.get(id=last_player.id)
-        if not us2:
-            us2 = UserSetting(id=last_player.id)
-        us2.games_played += 1
-        us2.name = display_name(last_player)
+        us_last = UserSetting.get(id=last_player.id)
+        if not us_last:
+            us_last = UserSetting(id=last_player.id)
+        us_last.games_played += 1
+        us_last.name = display_name(last_player)
+        if game.players_won == 0:
+            us_last.first_places += 1
+
+        us_dep = UserSetting.get(id=user.id)
+        if not us_dep:
+            us_dep = UserSetting(id=user.id)
+        us_dep.games_played += 1
+        us_dep.name = display_name(user)
 
         gm.end_game(chat, user)
         return True
+
+    # Oyun davam edir - tərk edən oyunçu sıralamaya (indiki sona) yazılır,
+    # xal qazanmır, amma oynadığı oyun sayına düşür
+    game.finish_order.append(user)
+
+    us_dep = UserSetting.get(id=user.id)
+    if not us_dep:
+        us_dep = UserSetting(id=user.id)
+    us_dep.games_played += 1
+    us_dep.name = display_name(user)
 
     return False
 

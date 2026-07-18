@@ -13,11 +13,16 @@
 #   us.stats = True               -> DƏRHAL Mongo-ya yazılır
 #   us.games_played += 1          -> DƏRHAL Mongo-ya yazılır
 #
-# Əlavə olaraq "level" və "rank_name" sahələri saxlanılır və hər dəfə
-# first_places (qələbə sayı) dəyişəndə avtomatik yenidən hesablanır.
+# QEYD: Bütün Mongo əməliyyatları try/except ilə əhatələnib ki, keçici bir
+# şəbəkə/DB xətası oyunun əsas məntiqini (kart oynama, sıra keçmə və s.)
+# yarımçıq kəsib "sıradan çıxarmasın" - xəta sadəcə log-a yazılır.
+
+import logging
 
 from database import db
 from levels import compute_level
+
+logger = logging.getLogger(__name__)
 
 users_collection = db["user_settings"] if db is not None else None
 
@@ -43,10 +48,15 @@ class UserSetting:
         doc = dict(DEFAULTS)
         doc["_id"] = id
         if users_collection is not None:
-            users_collection.update_one(
-                {"_id": id}, {"$setOnInsert": doc}, upsert=True
-            )
-            doc = users_collection.find_one({"_id": id}) or doc
+            try:
+                users_collection.update_one(
+                    {"_id": id}, {"$setOnInsert": doc}, upsert=True
+                )
+                fetched = users_collection.find_one({"_id": id})
+                if fetched:
+                    doc = fetched
+            except Exception as e:
+                logger.error(f"UserSetting yaradılarkən Mongo xətası (id={id}): {e}")
         self.__dict__["id"] = id
         for k, v in DEFAULTS.items():
             self.__dict__[k] = doc.get(k, v)
@@ -55,7 +65,11 @@ class UserSetting:
     def get(cls, id):
         if users_collection is None:
             return None
-        doc = users_collection.find_one({"_id": id})
+        try:
+            doc = users_collection.find_one({"_id": id})
+        except Exception as e:
+            logger.error(f"UserSetting oxunarkən Mongo xətası (id={id}): {e}")
+            return None
         if not doc:
             return None
         obj = cls.__new__(cls)
@@ -70,21 +84,21 @@ class UserSetting:
         if name == "id":
             return
 
-        if users_collection is not None:
-            users_collection.update_one(
-                {"_id": self.id}, {"$set": {name: value}}, upsert=True
-            )
-
-        # Qələbə sayı dəyişəndə səviyyə/rütbəni avtomatik yenilə
+        # Səviyyə/rütbə HƏMİŞƏ first_places-dən hesablanır - saxlanılan
+        # dəyər sadəcə arayış/leaderboard üçün əlavə məlumatdır.
         if name == "first_places":
             level, rank_name = compute_level(value)
-            if (level != self.__dict__.get("level") or
-                    rank_name != self.__dict__.get("rank_name")):
-                self.__dict__["level"] = level
-                self.__dict__["rank_name"] = rank_name
-                if users_collection is not None:
-                    users_collection.update_one(
-                        {"_id": self.id},
-                        {"$set": {"level": level, "rank_name": rank_name}},
-                        upsert=True,
-                    )
+            self.__dict__["level"] = level
+            self.__dict__["rank_name"] = rank_name
+
+        if users_collection is None:
+            return
+
+        try:
+            update = {"$set": {name: value}}
+            if name == "first_places":
+                update["$set"]["level"] = self.__dict__["level"]
+                update["$set"]["rank_name"] = self.__dict__["rank_name"]
+            users_collection.update_one({"_id": self.id}, update, upsert=True)
+        except Exception as e:
+            logger.error(f"UserSetting yazılarkən Mongo xətası (id={self.id}, sahə={name}): {e}")
