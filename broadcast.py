@@ -11,7 +11,7 @@ import logging
 import time
 
 from telegram import Update
-from telegram.error import RetryAfter
+from telegram.error import RetryAfter, Unauthorized, BadRequest, TelegramError
 from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext
 
 from config import SUDO_USERS
@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def track_activity(update: Update, context: CallbackContext):
-    """Hər mesajda (digər handler-lərin işinə mane olmadan, ayrı group-da)
-    qrupu/istifadəçini səssizcə Mongo-ya yazır."""
+    """Hər mesajda (hansı əmr/mətn olur olsun - /start, /uno, /new, /help və s.
+    daxil olmaqla) qrupu/istifadəçini səssizcə Mongo-ya yazır. Digər
+    handler-lərdən tamamilə ayrı (group=99) işlədiyi üçün heç birinin
+    məntiqinə toxunmur."""
     try:
         message = update.effective_message
         chat = update.effective_chat
@@ -41,8 +43,8 @@ def track_activity(update: Update, context: CallbackContext):
             add_served_chat(chat.id)
             if user:
                 add_served_user(user.id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"track_activity xətası: {e}")
 
 
 def new_member_handler(update: Update, context: CallbackContext):
@@ -52,8 +54,45 @@ def new_member_handler(update: Update, context: CallbackContext):
         new_members = update.message.new_chat_members or []
         if context.bot.id in [u.id for u in new_members]:
             add_served_chat(update.message.chat.id)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"new_member_handler xətası: {e}")
+
+
+def _forward_to_target(bot, target_id, source_chat_id, source_message_id, kind):
+    """Bir qrup/istifadəçiyə mesajı forward edir.
+    Return: 'sent' | 'blocked' | 'failed'"""
+    try:
+        bot.forward_message(target_id, source_chat_id, source_message_id)
+        return "sent"
+    except RetryAfter as e:
+        if e.retry_after > 200:
+            _log_broadcast_error(kind, target_id, f"RetryAfter çox uzun: {e.retry_after}s")
+            return "failed"
+        time.sleep(e.retry_after)
+        try:
+            bot.forward_message(target_id, source_chat_id, source_message_id)
+            return "sent"
+        except Unauthorized as ex:
+            _log_broadcast_error(kind, target_id, f"Unauthorized: {ex}")
+            return "blocked"
+        except Exception as ex:
+            _log_broadcast_error(kind, target_id, str(ex))
+            return "failed"
+    except Unauthorized as e:
+        # İstifadəçi botu bloklayıb, botu silib, ya da botla HEÇ VAXT şəxsi
+        # (/start) əlaqəyə keçməyib - Telegram-ın özü bu mesajı ötürməyə
+        # icazə vermir (platform məhdudiyyəti, koddan düzəldilə bilməz).
+        _log_broadcast_error(kind, target_id, f"Unauthorized: {e}")
+        return "blocked"
+    except BadRequest as e:
+        _log_broadcast_error(kind, target_id, f"BadRequest: {e}")
+        return "failed"
+    except TelegramError as e:
+        _log_broadcast_error(kind, target_id, f"TelegramError: {e}")
+        return "failed"
+    except Exception as e:
+        _log_broadcast_error(kind, target_id, str(e))
+        return "failed"
 
 
 def broadcast_command(update: Update, context: CallbackContext):
@@ -77,59 +116,63 @@ def broadcast_command(update: Update, context: CallbackContext):
 
     status_msg = msg.reply_text("⚡ Reklam prosesi başladı, gözlə...")
 
-    sent_chats, failed_chats = 0, 0
-    for chat in get_served_chats():
-        chat_id = chat["chat_id"]
-        try:
-            bot.forward_message(chat_id, source_chat_id, source_message_id)
-            sent_chats += 1
-            time.sleep(0.3)
-        except RetryAfter as e:
-            if e.retry_after > 200:
-                failed_chats += 1
-                continue
-            time.sleep(e.retry_after)
-            try:
-                bot.forward_message(chat_id, source_chat_id, source_message_id)
-                sent_chats += 1
-            except Exception as ex:
-                _log_broadcast_error("chat", chat_id, str(ex))
-                failed_chats += 1
-        except Exception as e:
-            _log_broadcast_error("chat", chat_id, str(e))
-            failed_chats += 1
+    served_chats = get_served_chats()
+    served_users = get_served_users()
 
-    sent_users, failed_users = 0, 0
-    for u in get_served_users():
-        uid = u["user_id"]
-        try:
-            bot.forward_message(uid, source_chat_id, source_message_id)
-            sent_users += 1
+    logger.info(f"/broadcast başladı: {len(served_chats)} qrup, {len(served_users)} istifadəçi qeydə alınıb.")
+
+    sent_chats = failed_chats = 0
+    try:
+        for chat in served_chats:
+            chat_id = chat["chat_id"]
+            result = _forward_to_target(bot, chat_id, source_chat_id, source_message_id, "chat")
+            if result == "sent":
+                sent_chats += 1
+            else:
+                failed_chats += 1
             time.sleep(0.3)
-        except RetryAfter as e:
-            if e.retry_after > 200:
-                failed_users += 1
-                continue
-            time.sleep(e.retry_after)
-            try:
-                bot.forward_message(uid, source_chat_id, source_message_id)
+    except Exception as e:
+        logger.error(f"/broadcast qruplara göndərilərkən gözlənilməz xəta: {e}")
+
+    sent_users = blocked_users = failed_users = 0
+    try:
+        for u in served_users:
+            uid = u["user_id"]
+            result = _forward_to_target(bot, uid, source_chat_id, source_message_id, "user")
+            if result == "sent":
                 sent_users += 1
-            except Exception as ex:
-                _log_broadcast_error("user", uid, str(ex))
+            elif result == "blocked":
+                blocked_users += 1
+            else:
                 failed_users += 1
-        except Exception as e:
-            _log_broadcast_error("user", uid, str(e))
-            failed_users += 1
+            time.sleep(0.3)
+    except Exception as e:
+        logger.error(f"/broadcast istifadəçilərə göndərilərkən gözlənilməz xəta: {e}")
 
     summary = (
-        f"✅ Reklam prosesi bitdi!\n\n"
-        f"👥 Qruplar: {sent_chats} uğurlu, {failed_chats} uğursuz\n"
-        f"👤 İstifadəçilər: {sent_users} uğurlu, {failed_users} uğursuz"
+        f"✅ *Reklam prosesi bitdi!*\n\n"
+        f"👥 *Qruplar* (cəmi {len(served_chats)}):\n"
+        f"   ✔️ Uğurlu: {sent_chats}\n"
+        f"   ❌ Uğursuz: {failed_chats}\n\n"
+        f"👤 *İstifadəçilər* (cəmi {len(served_users)}):\n"
+        f"   ✔️ Uğurlu: {sent_users}\n"
+        f"   🚫 Bloklayıb / botu heç vaxt başlatmayıb: {blocked_users}\n"
+        f"   ❌ Digər xəta: {failed_users}\n"
     )
+
+    logger.info(
+        f"/broadcast bitdi: qruplar {sent_chats}/{len(served_chats)} uğurlu, "
+        f"istifadəçilər {sent_users}/{len(served_users)} uğurlu "
+        f"({blocked_users} bloklanıb, {failed_users} digər xəta)."
+    )
+
     try:
-        status_msg.edit_text(summary)
+        status_msg.edit_text(summary, parse_mode="Markdown")
     except Exception:
-        msg.reply_text(summary)
+        try:
+            msg.reply_text(summary, parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"/broadcast yekun hesabatı göndərilə bilmədi: {e}")
 
 
 def register():

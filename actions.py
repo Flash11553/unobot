@@ -79,8 +79,11 @@ def process_departure(bot, chat, game, user):
     except NotEnoughPlayersError:
         last_player = game.current_player.user
 
-        # Sağ qalan oyunçu, tərk edəndən HƏMİŞƏ daha yaxşı yerdə olur
-        game.finish_order.append(last_player)
+        # Sağ qalan oyunçu bu raundun HƏQİQİ qalibidir (heç kim normal
+        # yolla bitirməyibsə) - buna görə HƏMİŞƏ sıralamanın LAP BAŞINA
+        # (1-ci yerə) yazılır, daha əvvəlki tərk edənlərin qabağına keçir.
+        # Oyunu bilavasitə bitirən (son tərk edən) isə sona yazılır.
+        game.finish_order.insert(0, last_player)
         game.finish_order.append(user)
 
         send_final_standings(bot, chat.id, game)
