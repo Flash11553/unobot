@@ -122,8 +122,8 @@ def broadcast_command(update: Update, context: CallbackContext):
     logger.info(f"/broadcast başladı: {len(served_chats)} qrup, {len(served_users)} istifadəçi qeydə alınıb.")
 
     sent_chats = failed_chats = 0
-    try:
-        for chat in served_chats:
+    for chat in served_chats:
+        try:
             chat_id = chat["chat_id"]
             result = _forward_to_target(bot, chat_id, source_chat_id, source_message_id, "chat")
             if result == "sent":
@@ -131,12 +131,13 @@ def broadcast_command(update: Update, context: CallbackContext):
             else:
                 failed_chats += 1
             time.sleep(0.3)
-    except Exception as e:
-        logger.error(f"/broadcast qruplara göndərilərkən gözlənilməz xəta: {e}")
+        except Exception as e:
+            logger.error(f"Qrup emalı zamanı gözlənilməz xəta ({chat}): {e}")
+            failed_chats += 1
 
     sent_users = blocked_users = failed_users = 0
-    try:
-        for u in served_users:
+    for u in served_users:
+        try:
             uid = u["user_id"]
             result = _forward_to_target(bot, uid, source_chat_id, source_message_id, "user")
             if result == "sent":
@@ -146,8 +147,9 @@ def broadcast_command(update: Update, context: CallbackContext):
             else:
                 failed_users += 1
             time.sleep(0.3)
-    except Exception as e:
-        logger.error(f"/broadcast istifadəçilərə göndərilərkən gözlənilməz xəta: {e}")
+        except Exception as e:
+            logger.error(f"İstifadəçi emalı zamanı gözlənilməz xəta ({u}): {e}")
+            failed_users += 1
 
     summary = (
         f"✅ *Reklam prosesi bitdi!*\n\n"

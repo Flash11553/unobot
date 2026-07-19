@@ -77,7 +77,13 @@ def process_departure(bot, chat, game, user):
     try:
         gm.leave_game(user, chat)
     except NotEnoughPlayersError:
-        last_player = game.current_player.user
+        # QEYD: gm.leave_game bu exception-u player.leave()-dan ƏVVƏL atır,
+        # yəni `user` HƏLƏ DƏ oyunçular halqasındadır və game.current_player
+        # səhvən elə `user`-in özü ola bilər (əgər növbə onun idisə). Doğru
+        # sağ qalanı game.players siyahısından (departure edəni çıxararaq)
+        # tapırıq ki, bu qeyri-müəyyənlikdən asılı olmasın.
+        remaining = [p.user for p in game.players if p.user.id != user.id]
+        last_player = remaining[0] if remaining else user
 
         # Sağ qalan oyunçu bu raundun HƏQİQİ qalibidir (heç kim normal
         # yolla bitirməyibsə) - buna görə HƏMİŞƏ sıralamanın LAP BAŞINA
@@ -102,7 +108,7 @@ def process_departure(bot, chat, game, user):
         us_dep.games_played += 1
         us_dep.name = display_name(user)
 
-        gm.end_game(chat, user)
+        gm.end_game(chat, last_player)
         return True
 
     # Oyun davam edir - tərk edən oyunçu sıralamaya (indiki sona) yazılır,
@@ -162,7 +168,10 @@ def do_play_card(bot, player, result_id):
         try:
             gm.leave_game(user, chat)
         except NotEnoughPlayersError:
-            last_player = game.current_player.user
+            # Eyni səbəbdən (bax: process_departure-dəki qeyd) game.current_player
+            # etibarsız ola bilər - sağ qalanı game.players-dən tapırıq.
+            remaining = [p.user for p in game.players if p.user.id != user.id]
+            last_player = remaining[0] if remaining else user
             game.finish_order.append(last_player)
 
             send_final_standings(bot, chat.id, game)
@@ -173,7 +182,7 @@ def do_play_card(bot, player, result_id):
             us2.games_played += 1
             us2.name = display_name(last_player)
 
-            gm.end_game(chat, user)
+            gm.end_game(chat, last_player)
 
 
 def do_draw(bot, player):

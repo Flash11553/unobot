@@ -4,10 +4,13 @@
 # /broadcast üçün qrup və şəxsi istifadəçi siyahısı. Domino botundakı EYNİ
 # məntiq: bir dəfə yazılan qeyd HEÇ VAXT silinmir (bot restart olsa belə).
 #
-# QEYD: sənədlərdə HƏM "_id" HƏM DƏ açıq "chat_id" / "user_id" sahəsi
-# saxlanılır (Mongo kolleksiyasında əvvəldən "chat_id"/"user_id" üzərində
-# unique index ola bilər - sahəni boş buraxmaq "duplicate key: null" xətası
-# yaradırdı, indi düzəldildi).
+# QEYD (GERİYƏ UYĞUNLUQ): Bu kolleksiyalarda tarix boyu İKİ fərqli sxem
+# istifadə olunub - köhnə sənədlərdə identifikator "_id" sahəsindədir, yeni
+# sənədlərdə isə açıq "chat_id"/"user_id" sahəsindədir. get_served_chats()/
+# get_served_users() HƏR İKİ formatı normallaşdıraraq HƏMİŞƏ "chat_id"/
+# "user_id" açarı ilə qaytarır ki, çağıran kod (broadcast.py) sxem
+# fərqindən asılı olmadan işləsin - əks halda köhnə formatlı bir sənəd
+# bütün broadcast dövrəsini səssizcə yarımçıq kəsə bilərdi.
 
 import logging
 
@@ -23,6 +26,13 @@ def add_served_chat(chat_id):
     if chats_collection is None:
         return
     try:
+        # Əvvəlcə köhnə formatda (yalnız _id) qeyd olub-olmadığını yoxla ki,
+        # təkrar (dublikat) sənəd yaranmasın
+        existing = chats_collection.find_one(
+            {"$or": [{"chat_id": chat_id}, {"_id": chat_id}]}
+        )
+        if existing:
+            return
         chats_collection.update_one(
             {"chat_id": chat_id},
             {"$setOnInsert": {"chat_id": chat_id}},
@@ -33,15 +43,32 @@ def add_served_chat(chat_id):
 
 
 def get_served_chats() -> list:
+    """Hər sənədi HƏMİŞƏ {'chat_id': <id>} formatında qaytarır - köhnə
+    formatlı sənədlər (yalnız _id) də daxil olmaqla."""
     if chats_collection is None:
         return []
-    return list(chats_collection.find({}))
+    result = []
+    try:
+        for doc in chats_collection.find({}):
+            chat_id = doc.get("chat_id")
+            if chat_id is None:
+                chat_id = doc.get("_id")
+            if chat_id is not None:
+                result.append({"chat_id": chat_id})
+    except Exception as e:
+        logger.error(f"Qruplar oxunarkən xəta: {e}")
+    return result
 
 
 def add_served_user(user_id):
     if bc_users_collection is None:
         return
     try:
+        existing = bc_users_collection.find_one(
+            {"$or": [{"user_id": user_id}, {"_id": user_id}]}
+        )
+        if existing:
+            return
         bc_users_collection.update_one(
             {"user_id": user_id},
             {"$setOnInsert": {"user_id": user_id}},
@@ -52,9 +79,21 @@ def add_served_user(user_id):
 
 
 def get_served_users() -> list:
+    """Hər sənədi HƏMİŞƏ {'user_id': <id>} formatında qaytarır - köhnə
+    formatlı sənədlər (yalnız _id) də daxil olmaqla."""
     if bc_users_collection is None:
         return []
-    return list(bc_users_collection.find({}))
+    result = []
+    try:
+        for doc in bc_users_collection.find({}):
+            user_id = doc.get("user_id")
+            if user_id is None:
+                user_id = doc.get("_id")
+            if user_id is not None:
+                result.append({"user_id": user_id})
+    except Exception as e:
+        logger.error(f"İstifadəçilər oxunarkən xəta: {e}")
+    return result
 
 
 def _log_broadcast_error(kind, entity_id, error_message):
