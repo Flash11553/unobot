@@ -60,25 +60,18 @@ def new_member_handler(update: Update, context: CallbackContext):
 
 
 def _forward_to_target(bot, target_id, source_chat_id, source_message_id, kind):
-    """Bir qrup/istifadəçiyə mesajı forward edir.
+    """Bir qrup/istifadəçiyə mesajı YALNIZ BİR DƏFƏ göndərməyə cəhd edir.
+    QƏSDƏN heç bir təkrar (retry) cəhd EDİLMİR - çünki RetryAfter xətasından
+    sonra ikinci cəhd bəzən eyni şəxsə mesajın İKİ DƏFƏ getməsinə səbəb
+    olurdu. Rate-limit-ə düşən hədəf sadəcə "uğursuz" sayılır, təkrar
+    göndərilmir.
     Return: 'sent' | 'blocked' | 'failed'"""
     try:
         bot.forward_message(target_id, source_chat_id, source_message_id)
         return "sent"
     except RetryAfter as e:
-        if e.retry_after > 200:
-            _log_broadcast_error(kind, target_id, f"RetryAfter çox uzun: {e.retry_after}s")
-            return "failed"
-        time.sleep(e.retry_after)
-        try:
-            bot.forward_message(target_id, source_chat_id, source_message_id)
-            return "sent"
-        except Unauthorized as ex:
-            _log_broadcast_error(kind, target_id, f"Unauthorized: {ex}")
-            return "blocked"
-        except Exception as ex:
-            _log_broadcast_error(kind, target_id, str(ex))
-            return "failed"
+        _log_broadcast_error(kind, target_id, f"RetryAfter: {e.retry_after}s (təkrar cəhd edilmədi)")
+        return "failed"
     except Unauthorized as e:
         # İstifadəçi botu bloklayıb, botu silib, ya da botla HEÇ VAXT şəxsi
         # (/start) əlaqəyə keçməyib - Telegram-ın özü bu mesajı ötürməyə

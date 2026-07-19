@@ -431,6 +431,7 @@ def perform_game_start(bot, job_queue, chat, game):
     dispatcher.run_async(send_first)
 
 
+@user_locale
 def start_game(update: Update, context: CallbackContext):
     """Handler for the /start command.
     Əgər qrupda açıq qeydiyyat menyusu varsa, /start elə "Oyunu Başlat ▶️"
