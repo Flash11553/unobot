@@ -44,16 +44,20 @@ def add_served_chat(chat_id):
 
 def get_served_chats() -> list:
     """Hər sənədi HƏMİŞƏ {'chat_id': <id>} formatında qaytarır - köhnə
-    formatlı sənədlər (yalnız _id) də daxil olmaqla."""
+    formatlı sənədlər (yalnız _id) də daxil olmaqla. Eyni ID üçün BİRDƏN
+    ARTIQ sənəd olsa belə (əvvəlki sxem versiyalarından qalma), nəticədə
+    hər ID YALNIZ BİR DƏFƏ görünür."""
     if chats_collection is None:
         return []
+    seen = set()
     result = []
     try:
         for doc in chats_collection.find({}):
             chat_id = doc.get("chat_id")
             if chat_id is None:
                 chat_id = doc.get("_id")
-            if chat_id is not None:
+            if chat_id is not None and chat_id not in seen:
+                seen.add(chat_id)
                 result.append({"chat_id": chat_id})
     except Exception as e:
         logger.error(f"Qruplar oxunarkən xəta: {e}")
@@ -80,16 +84,21 @@ def add_served_user(user_id):
 
 def get_served_users() -> list:
     """Hər sənədi HƏMİŞƏ {'user_id': <id>} formatında qaytarır - köhnə
-    formatlı sənədlər (yalnız _id) də daxil olmaqla."""
+    formatlı sənədlər (yalnız _id) də daxil olmaqla. Eyni ID üçün BİRDƏN
+    ARTIQ sənəd olsa belə (əvvəlki sxem versiyalarından qalma), nəticədə
+    hər ID YALNIZ BİR DƏFƏ görünür - bu, eyni istifadəçiyə reklamın 2-3
+    dəfə getməsinin qarşısını alır."""
     if bc_users_collection is None:
         return []
+    seen = set()
     result = []
     try:
         for doc in bc_users_collection.find({}):
             user_id = doc.get("user_id")
             if user_id is None:
                 user_id = doc.get("_id")
-            if user_id is not None:
+            if user_id is not None and user_id not in seen:
+                seen.add(user_id)
                 result.append({"user_id": user_id})
     except Exception as e:
         logger.error(f"İstifadəçilər oxunarkən xəta: {e}")

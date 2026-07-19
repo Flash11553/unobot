@@ -8,6 +8,7 @@
 #   - Heç nə Mongo-dan silinmir (bot restart olsa belə)
 
 import logging
+import threading
 import time
 
 from telegram import Update
@@ -95,27 +96,9 @@ def _forward_to_target(bot, target_id, source_chat_id, source_message_id, kind):
         return "failed"
 
 
-def broadcast_command(update: Update, context: CallbackContext):
-    """Handler for the /broadcast command"""
-    msg = update.message
-    bot = context.bot
-
-    if str(msg.from_user.id) not in SUDO_USERS:
-        msg.reply_text("⛔ Bu əmr yalnız adminlər üçündür.")
-        return
-
-    if not msg.reply_to_message:
-        msg.reply_text(
-            "✍️ Yaymaq istədiyin mesaja (reklam, kanal postu, şəkil - nə olursa) "
-            "REPLY edərək /broadcast yaz."
-        )
-        return
-
-    source_chat_id = msg.chat.id
-    source_message_id = msg.reply_to_message.message_id
-
-    status_msg = msg.reply_text("⚡ Reklam prosesi başladı, gözlə...")
-
+def _run_broadcast(bot, source_chat_id, source_message_id, status_msg, fallback_msg):
+    """Reklamın faktiki göndərilməsi - bu, ayrıca arxa fon thread-də işləyir
+    ki, botun əsas dispatcher-i (oyun, digər əmrlər) HEÇ VAXT bloklanmasın."""
     served_chats = get_served_chats()
     served_users = get_served_users()
 
@@ -172,9 +155,40 @@ def broadcast_command(update: Update, context: CallbackContext):
         status_msg.edit_text(summary, parse_mode="Markdown")
     except Exception:
         try:
-            msg.reply_text(summary, parse_mode="Markdown")
+            fallback_msg.reply_text(summary, parse_mode="Markdown")
         except Exception as e:
             logger.error(f"/broadcast yekun hesabatı göndərilə bilmədi: {e}")
+
+
+def broadcast_command(update: Update, context: CallbackContext):
+    """Handler for the /broadcast command. Faktiki göndərmə işini arxa fon
+    thread-inə ötürür və DƏRHAL geri qayıdır - bu sayədə /broadcast davam
+    edərkən botun özü (oyun, digər əmrlər) heç vaxt donmur/bloklanmır."""
+    msg = update.message
+    bot = context.bot
+
+    if str(msg.from_user.id) not in SUDO_USERS:
+        msg.reply_text("⛔ Bu əmr yalnız adminlər üçündür.")
+        return
+
+    if not msg.reply_to_message:
+        msg.reply_text(
+            "✍️ Yaymaq istədiyin mesaja (reklam, kanal postu, şəkil - nə olursa) "
+            "REPLY edərək /broadcast yaz."
+        )
+        return
+
+    source_chat_id = msg.chat.id
+    source_message_id = msg.reply_to_message.message_id
+
+    status_msg = msg.reply_text("⚡ Reklam prosesi başladı, gözlə...")
+
+    thread = threading.Thread(
+        target=_run_broadcast,
+        args=(bot, source_chat_id, source_message_id, status_msg, msg),
+        daemon=True,
+    )
+    thread.start()
 
 
 def register():
