@@ -33,7 +33,7 @@ def help_handler(update: Update, context: CallbackContext):
     help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
       "\n"
       "1️⃣ Bu botu qrupunuza əlavə edin\n"
-      "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və ya \"Oyuna Qoşul\"(/join) düyməsi ilə mövcud oyuna qoşulun\n"
+      "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və \"Oyuna Qoşul\"(/join) düyməsi ilə mövcud oyuna qoşulun\n"
       "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra \"Oyunu Başlat\"(/start) düyməsi ilə oyunu başladın\n"
       "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün \"Seçiminizi Edin\" üzərinə toxunun\n"
       "\n"
