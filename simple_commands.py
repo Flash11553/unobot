@@ -35,7 +35,7 @@ def help_handler(update: Update, context: CallbackContext):
       "1️⃣ Bu botu qrupunuza əlavə edin\n"
       "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və ya \"Oyuna Qoşul\"(/join) düyməsi ilə mövcud oyuna qoşulun\n"
       "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra \"Oyunu Başlat\"(/start) düyməsi ilə oyunu başladın\n"
-      "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün \"Seçiminizi Edin"\ üzərinə toxunun\n"
+      "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün \"Seçiminizi Edin\" üzərinə toxunun\n"
       "\n"
       "👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
       "🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
