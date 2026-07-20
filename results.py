@@ -73,7 +73,7 @@ def add_no_game(results):
     results.append(
         InlineQueryResultArticle(
             "nogame",
-            title=_("Siz Oynamırsız"),
+            title=_("Uno 💎"),
             input_message_content=
             InputTextMessageContent(_('Aktiv oyun yoxdur. Bir oyun yaratmaq üçün: /uno yazın ✅'))
         )
