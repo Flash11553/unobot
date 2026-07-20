@@ -33,21 +33,20 @@ def help_handler(update: Update, context: CallbackContext):
     help_text = _("🎮 UNO Oyununa Xoş Gəlmisiniz:\n"
       "\n"
       "1️⃣ Bu botu qrupunuza əlavə edin\n"
-      "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və ya \"Oyuna Qoşul\" düyməsi ilə mövcud oyuna qoşulun\n"
-      "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra \"Oyunu Başlat\" düyməsi ilə oyunu başladın\n"
-      "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün üzərinə toxunun\n"
+      "2️⃣ Qrupda /uno yazaraq yeni oyun yaradın və ya \"Oyuna Qoşul\"(/join) düyməsi ilə mövcud oyuna qoşulun\n"
+      "3️⃣ Ən azı 2 oyunçu qoşulduqdan sonra \"Oyunu Başlat\"(/start) düyməsi ilə oyunu başladın\n"
+      "4️⃣ Oyun başladıqda 🃏 kartlarınızdan birini seçmək üçün \"Seçiminizi Edin"\ üzərinə toxunun\n"
       "\n"
       "👥 Oyuna istənilən vaxt yeni oyunçular qoşula bilər\n"
       "🚪 Oyundan çıxmaq istəyirsinizsə, /leave yazın\n"
-      "⛔ /skip yalnız 3 və ya daha çox oyunçu qalanda sıradakı oyunçunu keçir\n"
-      "🔔 Yeni oyun başladıqda xəbərdar olmaq üçün /notify_me yazmağı unutmayın\n"
+      "⏭️ Oyunçunu keçmək istəyirsinizsə, /skip yazın\n"
       "\n"
       "⚙️ Statistikanızı görmək üçün:\n"
       "💎 /profile — şəxsi statistikanız\n"
       "🏆 /rating — top 25 reytinq siyahısı\n"
       "🎖 /rutbeler — səviyyə və rütbələr haqqında\n"
       "\n"
-      "🔐 Yalnız oyun yaradıcısı üçün əmrlər:\n"
+      "🔐 Yalnız qrupda oyunu başladan üçün əmrlər:\n"
       "🚫 /close — Oyuna girişləri bağla\n"
       "✅ /open — Oyuna girişləri aç\n"
       "🛑 /stop — Oyunu dayandır\n")
@@ -111,7 +110,7 @@ def profile_handler(update: Update, context: CallbackContext):
 
     if games_played == 0:
         send_async(context.bot, update.message.chat_id,
-                   text=_("Siz hələ heç bir oyun oynamamısınız. /uno yazaraq oyun başladın!"))
+                   text=_("Siz hələ heç bir oyun oynamamısınız. Əvvəlcə ən azından bir oyun oynayın qrupda dostlarnızla: /uno yazaraq oyun başladın!"))
         return
 
     level, rank_name = compute_level(first_places)
@@ -164,7 +163,7 @@ def rating_leaderboard(update: Update, context: CallbackContext):
 def ranks_handler(update: Update, context: CallbackContext):
     """Handler for the /rutbeler command - səviyyə/rütbə sistemini izah edir"""
     lines = ["🎖 *Səviyyə və Rütbələr*\n",
-             "Hər dəfə bir oyunu 1-ci yerdə bitirdikcə (qalib gəldikcə) "
+             "Hər dəfə oyunçu oyunu 1-ci yerdə bitirdikcə (qalib gəldikcə) "
              "xalınız (qələbə sayınız) 1 artır. Qələbə sayınız artdıqca "
              "səviyyəniz və rütbəniz avtomatik yüksəlir:\n"]
 
