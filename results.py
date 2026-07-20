@@ -75,8 +75,7 @@ def add_no_game(results):
             "nogame",
             title=_("Siz Oynamırsız"),
             input_message_content=
-            InputTextMessageContent(_('İndi oynanmır. /new əmri ilə oyunu qurun'
-                                      'və ya /join əmr ilə oyuna qoşulun'))
+            InputTextMessageContent(_('Aktiv oyun yoxdur. Bir oyun yaratmaq üçün: /uno yazın ✅'))
         )
     )
 
