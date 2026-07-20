@@ -9,15 +9,15 @@
 # (lazımi_qələbə_sayı, səviyyə, rütbə_adı)
 LEVELS = [
     (0,   1,  "🔰 Yeni Başlayan"),
-    (5,   2,  "🥉 Çaylaq"),
-    (15,  3,  "🥈 Bacarıqlı"),
-    (30,  4,  "🥇 Təcrübəli"),
-    (50,  5,  "💪 Usta"),
+    (5,   2,  "🎮 Həvəskar"),
+    (15,  3,  "🥇 Təcrübəli"),
+    (30,  4,  "⚔️ Peşəkar"),
+    (50,  5,  "💠 Elit"),
     (80,  6,  "🔥 Ekspert"),
     (120, 7,  "👑 Master"),
     (180, 8,  "🌟 Qrandmaster"),
     (250, 9,  "🏆 Əfsanə"),
-    (350, 10, "💎 Uno Kralı"),
+    (350, 10, "💎 Uno İmperatoru"),
 ]
 
 
