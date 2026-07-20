@@ -27,7 +27,7 @@ def do_skip(bot, game):
 
     if len(game.players) <= 2:
         send_async(bot, chat.id,
-                   text=_("Oyunda iki nəfər qalığda skip oluna bilməz oyunçu ⛔"))
+                   text=_("Oyunda iki nəfər qaldığda skip oluna bilməz ⛔"))
         return
 
     ended = process_departure(bot, chat, game, skipped_player.user)
