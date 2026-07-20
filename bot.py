@@ -185,7 +185,7 @@ def join_game(update: Update, context: CallbackContext):
     except NoGameInChatError:
         send_async(context.bot, chat.id,
                    text=_("Heç bir Oyun getmir indi. "
-                          "Yeni oyun bu əmr ilə yarat: /new"),
+                          "Yeni oyunu bu əmr ilə yarat: /uno"),
                    reply_to_message_id=update.message.message_id)
 
     except AlreadyJoinedError:
@@ -201,7 +201,7 @@ def join_game(update: Update, context: CallbackContext):
 
     else:
         send_async(context.bot, chat.id,
-                   text=_("✅ Oyunçu {name} oyuna qoşuldu!")
+                   text=_("✅ {name} oyuna qoşuldu!")
                    .format(name=display_name(update.message.from_user)))
         refreshed_lobby = get_open_lobby(chat.id)
         if refreshed_lobby is not None:
@@ -237,7 +237,7 @@ def leave_game(update: Update, context: CallbackContext):
             return
 
         send_async(context.bot, chat.id,
-                   text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl .",
+                   text=__("{name} oyunu tərk etdi oyun başlamadan əvvəl",
                            multi=game.translate).format(
                        name=display_name(user)),
                    reply_to_message_id=update.message.message_id)
@@ -251,7 +251,7 @@ def leave_game(update: Update, context: CallbackContext):
     try:
         ended = process_departure(context.bot, chat, game, user)
     except NoGameInChatError:
-        send_async(context.bot, chat.id, text=_("Siz oynamırsız bu qrupdaki oyunda"),
+        send_async(context.bot, chat.id, text=_("Siz bu qrupdaki oyunda oynamırsız"),
                    reply_to_message_id=update.message.message_id)
         return
 
@@ -272,7 +272,7 @@ def lobby_join_callback(update: Update, context: CallbackContext):
 
     game = get_open_lobby(chat.id)
     if game is None:
-        query.answer(_("Oyun bitib. /new ilə yenisini başladın."), show_alert=True)
+        query.answer(_("Oyun bitib. /uno ilə yenisini başladın."), show_alert=True)
         return
 
     if len(game.players) >= MAX_PLAYERS:
@@ -300,7 +300,7 @@ def lobby_join_callback(update: Update, context: CallbackContext):
     update_lobby_message(context.bot, chat.id, game)
     query.answer(_("Oyuna qoşuldunuz!"), show_alert=False)
     send_async(context.bot, chat.id,
-               text=_("✅ Oyunçu {name} oyuna qoşuldu!").format(name=display_name(user)))
+               text=_("✅ {name} oyuna qoşuldu!").format(name=display_name(user)))
 
 
 @user_locale
@@ -506,7 +506,7 @@ def open_game(update: Update, context: CallbackContext):
 
     if not games:
         send_async(context.bot, chat.id,
-                   text=_("Bu Qrupda heç bir Oyun oynanılmır"))
+                   text=_("Bu Qrupda heç bir oyun oynanılmır"))
         return
 
     game = games[-1]
@@ -595,7 +595,7 @@ def skip_player(update: Update, context: CallbackContext):
     player = gm.player_for_user_in_chat(user, chat)
     if not player:
         send_async(context.bot, chat.id,
-                   text=_("Siz Oyun oynamırsız bu qrupda ."))
+                   text=_("Sizin oynadığınız bir oyun yoxdur"))
         return
 
     game = player.game
